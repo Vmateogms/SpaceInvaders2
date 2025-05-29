@@ -254,7 +254,8 @@ export class JuegoService {
       y: sistemaSeleccionado.y,
       speed: this.tiposNave[tipoNave].speed,
       moving: false,
-      size: 2 // Tamaño predeterminado
+      size: 2, // Tamaño predeterminado
+      location: sistemaSeleccionado.id // Necesario para que aparezca en el panel de control
     };
     
     estado.ships.push(nuevaNave);

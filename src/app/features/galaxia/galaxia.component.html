@@ -37,6 +37,17 @@
                 </button>
               }
             </div>
+          } @else {
+            <div class="actions">
+              <button class="action-btn" (click)="iniciarColonizacion(sistema)">
+                Colonizar
+              </button>
+              @if (sistema.owner === 'enemy') {
+                <button class="action-btn warning" (click)="iniciarColonizacion(sistema)">
+                  Atacar
+                </button>
+              }
+            </div>
           }
         </div>
       }
@@ -215,6 +226,76 @@
             <p>Ganador: {{ conflictoActivo.resultados.ganador }}</p>
             <p>Bajas atacantes: {{ conflictoActivo.resultados.navesPerdidasAtacante }}</p>
             <p>Bajas defensoras: {{ conflictoActivo.resultados.navesPerdidasDefensor }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+  
+  <!-- Modal de colonización para seleccionar unidades -->
+  @if (modalColonizacionActivo) {
+    <div class="modal-overlay" (click)="cancelarColonizacion()">
+      <div class="modal-content" (click)="$event.stopPropagation()" style="width: 450px;">
+        <div class="modal-header" style="background-color: #2c3e50; padding: 15px; border-bottom: 2px solid #3498db;">
+          <h2 style="margin: 0; color: white;">Colonizar {{ sistemaParaColonizar?.name || 'Sistema' }}</h2>
+          <button class="close-btn" (click)="cancelarColonizacion()">&times;</button>
+        </div>
+        
+        <div style="padding: 20px;">
+          <p style="margin-bottom: 20px;">
+            <strong>Selecciona las naves para enviar a colonizar este sistema:</strong>
+          </p>
+          
+          <!-- Lista de sistemas con naves disponibles -->
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 10px;">Selecciona un sistema de origen:</label>
+            <select [(ngModel)]="sistemaOrigenSeleccionado" (change)="cargarNavesDisponiblesColonizacion()" 
+                    style="width: 100%; padding: 10px; background-color: #34495e; color: white; border: 1px solid #3498db;">
+              <option [value]="null">-- Selecciona un sistema --</option>
+              @for (sistema of getSistemasJugador(); track sistema.id) {
+                <option [value]="sistema.id">{{ sistema.name }} ({{ contarNavesEnSistema(sistema.id) }} naves)</option>
+              }
+            </select>
+          </div>
+          
+          <!-- Lista de naves disponibles en el sistema seleccionado -->
+          <div style="margin-bottom: 20px; max-height: 300px; overflow-y: auto;">
+            @if (navesDisponiblesParaColonizacion.length > 0) {
+              @for (nave of navesDisponiblesParaColonizacion; track nave.id) {
+                <div style="padding: 10px; margin-bottom: 5px; border: 1px solid #3498db; display: flex; align-items: center; justify-content: space-between;">
+                  <div>
+                    <input type="checkbox" [id]="'nave-col-' + nave.id" 
+                           [checked]="navesSeleccionadasParaColonizacion.includes(nave.id)"
+                           (change)="toggleNaveParaColonizacion(nave.id)">
+                    <label [for]="'nave-col-' + nave.id" style="margin-left: 8px;">
+                      {{ getNombreNave(nave.type) }} (ID: {{ nave.id }})
+                    </label>
+                  </div>
+                  <div>
+                    HP: {{ nave.hp }}/{{ nave.maxHp || nave.hp }}
+                  </div>
+                </div>
+              }
+            } @else {
+              <div style="padding: 20px; text-align: center; color: #aaa;">
+                @if (sistemaOrigenSeleccionado) {
+                  No hay naves disponibles en este sistema
+                } @else {
+                  Selecciona un sistema para ver las naves disponibles
+                }
+              </div>
+            }
+          </div>
+          
+          <!-- Botones de acción -->
+          <div style="display: flex; justify-content: space-between;">
+            <button class="action-btn secondary" (click)="cancelarColonizacion()">
+              Cancelar
+            </button>
+            <button class="action-btn" [disabled]="navesSeleccionadasParaColonizacion.length === 0"
+                    (click)="ejecutarColonizacion()">
+              Enviar {{ navesSeleccionadasParaColonizacion.length }} naves
+            </button>
           </div>
         </div>
       </div>

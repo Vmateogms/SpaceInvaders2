@@ -39,6 +39,9 @@ export interface NaveEnMovimiento {
   mision: 'atacar' | 'defender' | 'colonizar' | 'patrullar';
   targetId?: number; // ID del sistema u outpost objetivo
   size?: number; // Tamaño de la nave basado en su tipo: pequeño (1), mediano (2), grande (3)
+  hp?: number; // Puntos de vida de la nave
+  attack?: number; // Poder de ataque de la nave
+  maxHp?: number; // Puntos de vida máximos
 }
 
 export interface ConflictoBatalla {
@@ -47,6 +50,14 @@ export interface ConflictoBatalla {
   atacantes: any[]; // Naves atacantes
   defensores: any[]; // Naves o defensas
   estado: 'activo' | 'finalizado';
+  nombreSistema?: string; // Nombre del sistema donde ocurre el conflicto
+  nombreOutpost?: string; // Nombre del outpost donde ocurre el conflicto
+  // Propiedades para seguimiento de progreso y resolución
+  progreso?: number; // 0-100
+  inicioBatalla?: number; // timestamp cuando comenzó
+  duracionTotal?: number; // duración en milisegundos
+  radioVisible?: number; // Radio del círculo de batalla para detección de clics
+  probabilidadVictoriaJugador?: number; // Probabilidad de victoria (0-100)
   resultados?: {
     ganador: string;
     navesPerdidasAtacante: number;

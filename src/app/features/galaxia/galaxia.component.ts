@@ -1,5 +1,6 @@
 import { Component, inject, ElementRef, AfterViewInit, ViewChild, HostListener, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { JuegoService } from '../../services/juego.service';
 import { EnemyAiService } from '../../services/enemy-ai.service';
 import { SistemaEstelar, OutpostEspacial, NaveEnMovimiento, ConflictoBatalla } from '../../models/sistema-estelar';
@@ -8,7 +9,7 @@ import { NaveAtaque } from '../../models/nave-ataque';
 @Component({
   selector: 'app-galaxia',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './galaxia.component.html',
   styleUrls: ['./galaxia.component.css']
 })
@@ -20,6 +21,13 @@ export class GalaxiaComponent implements AfterViewInit {
   
   // Signals para la selección de objetos
   private _outpostSeleccionado = signal<number | null>(null);
+  
+  // Sistema de colonización
+  modalColonizacionActivo = false;
+  sistemaParaColonizar: SistemaEstelar | null = null;
+  sistemaOrigenSeleccionado: number | null = null;
+  navesDisponiblesParaColonizacion: NaveAtaque[] = [];
+  navesSeleccionadasParaColonizacion: number[] = [];
   
   // Estado del mapa interactivo
   private mapWidth = 8000; // Mapa extremadamente grande
@@ -180,6 +188,9 @@ export class GalaxiaComponent implements AfterViewInit {
       
       // Actualizar posiciones de naves en movimiento
       this.actualizarNavesEnMovimiento(deltaTime);
+      
+      // Actualizar progreso de batallas activas
+      this.actualizarBatallas(deltaTime);
       
       // Comprobar colisiones y batallas
       this.comprobarConflictos();
@@ -579,16 +590,62 @@ export class GalaxiaComponent implements AfterViewInit {
     const x = conflicto.ubicacion.x;
     const y = conflicto.ubicacion.y;
     
-    // Destello de batalla
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+    // Radio del círculo de batalla (para detección de clics)
+    const radioBatalla = 25 + Math.sin(Date.now() / 200) * 5;
+    conflicto.radioVisible = radioBatalla; // Guardar para detección de clics
+    
+    // Destello de batalla con color basado en el progreso
+    let colorBatalla = 'rgba(255, 0, 0, 0.4)';
+    
+    // Si hay progreso, mostrar visualmente
+    if (conflicto.progreso !== undefined) {
+      // Color según progreso (rojo -> naranja -> amarillo -> verde)
+      if (conflicto.progreso < 25) {
+        colorBatalla = 'rgba(255, 0, 0, 0.4)';
+      } else if (conflicto.progreso < 50) {
+        colorBatalla = 'rgba(255, 120, 0, 0.4)';
+      } else if (conflicto.progreso < 75) {
+        colorBatalla = 'rgba(255, 200, 0, 0.4)';
+      } else {
+        colorBatalla = 'rgba(100, 255, 0, 0.4)';
+      }
+      
+      // Dibujar anillo de progreso
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, radioBatalla, 0, Math.PI * 2 * (conflicto.progreso / 100));
+      ctx.stroke();
+    }
+    
+    // Círculo de batalla principal
+    ctx.fillStyle = colorBatalla;
     ctx.beginPath();
-    ctx.arc(x, y, 20 + Math.sin(Date.now() / 200) * 5, 0, Math.PI * 2);
+    ctx.arc(x, y, radioBatalla, 0, Math.PI * 2);
     ctx.fill();
     
-    // Símbolo de batalla ("!")
-    ctx.fillStyle = 'red';
+    // Símbolo de batalla
+    ctx.fillStyle = 'white';
     ctx.font = 'bold 16px Arial';
-    ctx.fillText('!', x - 3, y + 5);
+    
+    // Mostrar un símbolo diferente según el estado
+    if (conflicto.estado === 'finalizado') {
+      // Mostrar quién ganó
+      if (conflicto.resultados?.ganador === 'player') {
+        ctx.fillText('✔', x - 6, y + 5); // Marca de verificación
+      } else {
+        ctx.fillText('X', x - 5, y + 5); // X para derrota
+      }
+    } else {
+      // Batalla en curso
+      ctx.fillText('!', x - 3, y + 5);
+      
+      // Si tiene progreso, mostrar porcentaje
+      if (conflicto.progreso !== undefined) {
+        ctx.font = '10px Arial';
+        ctx.fillText(`${Math.floor(conflicto.progreso)}%`, x - 10, y + 20);
+      }
+    }
   }
   
   dibujarSeleccion(ctx: CanvasRenderingContext2D): void {
@@ -774,13 +831,16 @@ export class GalaxiaComponent implements AfterViewInit {
         Math.pow(conflicto.ubicacion.x - worldPos.x, 2) + 
         Math.pow(conflicto.ubicacion.y - worldPos.y, 2)
       );
-      return distancia <= 20; // Radio de detección
+      // Usar el radio visible si está definido, de lo contrario usar un valor predeterminado
+      const radioDeteccion = conflicto.radioVisible || 25;
+      return distancia <= radioDeteccion;
     });
     
     if (conflictoSeleccionado) {
+      // Mostrar el modal de batalla
       this.mostrarModalBatalla(conflictoSeleccionado);
       return true;
-    }
+    } 
     
     return false;
   }
@@ -814,9 +874,129 @@ export class GalaxiaComponent implements AfterViewInit {
   }
   
   mostrarModalBatalla(conflicto: ConflictoBatalla): void {
-    // Aquí iría la lógica para mostrar el modal de batalla
+    // Mostrar el modal de batalla
+    this.conflictoActivo = conflicto;
+    
+    // Si la batalla acaba de iniciar, configurarla
+    if (conflicto.estado === 'activo' && !conflicto.inicioBatalla) {
+      this.iniciarProgresoBatalla(conflicto);
+    }
+    
     console.log('Mostrando batalla:', conflicto);
-    // Esto se implementaría completamente cuando tengamos el componente de modal
+  }
+  
+  /**
+   * Inicia el progreso de resolución de una batalla
+   */
+  iniciarProgresoBatalla(conflicto: ConflictoBatalla): void {
+    // Marcar el inicio de la batalla
+    conflicto.inicioBatalla = Date.now();
+    
+    // Asignar una duración aleatoria entre 30 segundos y 4 minutos
+    const minDuracion = 30000; // 30 segundos
+    const maxDuracion = 240000; // 4 minutos
+    conflicto.duracionTotal = Math.floor(Math.random() * (maxDuracion - minDuracion)) + minDuracion;
+    
+    // Iniciar progreso en 0
+    conflicto.progreso = 0;
+    
+    console.log(`Batalla iniciada. Duración estimada: ${Math.round(conflicto.duracionTotal / 1000)} segundos`);
+    
+    // Calcular probabilidades de victoria basadas en fuerzas
+    this.calcularProbabilidadesVictoria(conflicto);
+  }
+  
+  /**
+   * Calcula las probabilidades de victoria basadas en las fuerzas involucradas
+   */
+  calcularProbabilidadesVictoria(conflicto: ConflictoBatalla): void {
+    // Calcular poder total de atacantes
+    let poderAtacantes = 0;
+    let unidadesAtacantes = 0;
+    
+    conflicto.atacantes.forEach(atacante => {
+      poderAtacantes += (atacante.attack || 10) * (atacante.hp || 100) / 100;
+      unidadesAtacantes++;
+    });
+    
+    // Calcular poder total de defensores
+    let poderDefensores = 0;
+    let unidadesDefensores = 0;
+    
+    conflicto.defensores.forEach(defensor => {
+      poderDefensores += (defensor.attack || 5) * (defensor.hp || 50) / 100;
+      unidadesDefensores++;
+    });
+    
+    // Factor aleatorio para añadir incertidumbre (entre 0.7 y 1.3)
+    const factorAleatorio = 0.7 + Math.random() * 0.6;
+    
+    // Probabilidad base de victoria del jugador (0-100)
+    const probabilidadVictoria = (poderAtacantes / (poderAtacantes + poderDefensores * factorAleatorio)) * 100;
+    
+    // Guardar estas probabilidades para cuando termine la batalla
+    conflicto.probabilidadVictoriaJugador = Math.min(Math.max(probabilidadVictoria, 5), 95); // Limitar entre 5% y 95%
+    
+    console.log(`Probabilidad victoria jugador: ${Math.round(conflicto.probabilidadVictoriaJugador)}%`);
+    console.log(`Fuerzas: Atacantes (${unidadesAtacantes}) poder ${poderAtacantes.toFixed(1)} vs 
+               Defensores (${unidadesDefensores}) poder ${poderDefensores.toFixed(1)}`);
+  }
+  
+  /**
+   * Actualiza el progreso de todas las batallas activas
+   */
+  actualizarBatallas(deltaTime: number): void {
+    const tiempoActual = Date.now();
+    
+    // Actualizar cada batalla activa
+    for (const conflicto of this.conflictos) {
+      if (conflicto.estado === 'activo' && conflicto.inicioBatalla && conflicto.duracionTotal) {
+        // Calcular progreso basado en el tiempo transcurrido
+        const tiempoTranscurrido = tiempoActual - conflicto.inicioBatalla;
+        
+        if (tiempoTranscurrido >= conflicto.duracionTotal) {
+          // La batalla ha terminado
+          conflicto.progreso = 100;
+          this.resolverBatalla(conflicto);
+        } else {
+          // Actualizar progreso
+          conflicto.progreso = (tiempoTranscurrido / conflicto.duracionTotal) * 100;
+        }
+      }
+    }
+  }
+  
+  /**
+   * Resuelve el resultado de una batalla cuando alcanza el 100% de progreso
+   */
+  resolverBatalla(conflicto: ConflictoBatalla): void {
+    if (conflicto.estado !== 'activo') return;
+    
+    // Determinar ganador basado en probabilidades calculadas
+    const probabilidadVictoria = conflicto.probabilidadVictoriaJugador || 50;
+    const resultadoAleatorio = Math.random() * 100;
+    
+    const victoriaJugador = resultadoAleatorio <= probabilidadVictoria;
+    
+    // Calcular pérdidas (entre 20% y 80% de las unidades)
+    const perdidaMinima = 0.2;
+    const perdidaMaxima = 0.8;
+    const factorPerdidaAtacante = perdidaMinima + Math.random() * (perdidaMaxima - perdidaMinima);
+    const factorPerdidaDefensor = perdidaMinima + Math.random() * (perdidaMaxima - perdidaMinima);
+    
+    const navesPerdidasAtacante = Math.floor(conflicto.atacantes.length * (victoriaJugador ? factorPerdidaAtacante * 0.7 : factorPerdidaAtacante * 1.2));
+    const navesPerdidasDefensor = Math.floor(conflicto.defensores.length * (victoriaJugador ? factorPerdidaDefensor * 1.2 : factorPerdidaDefensor * 0.7));
+    
+    // Actualizar el estado de la batalla
+    conflicto.estado = 'finalizado';
+    conflicto.resultados = {
+      ganador: victoriaJugador ? 'player' : 'enemy',
+      navesPerdidasAtacante,
+      navesPerdidasDefensor,
+      recursosCapturados: victoriaJugador ? Math.floor(Math.random() * 100) + 50 : 0
+    };
+    
+    console.log(`Batalla finalizada. Ganador: ${conflicto.resultados.ganador}. Pérdidas atacante: ${navesPerdidasAtacante}, Defensor: ${navesPerdidasDefensor}`);
   }
   
   colocarOutpost(pos: {x: number, y: number}): void {
@@ -939,8 +1119,112 @@ export class GalaxiaComponent implements AfterViewInit {
           x: nave.origen.x + (nave.destino.x - nave.origen.x) * t,
           y: nave.origen.y + (nave.destino.y - nave.origen.y) * t
         };
+        
+        // NUEVO: Verificar colisiones durante el movimiento
+        this.verificarColisionesDuranteMovimiento(nave, index);
       }
     });
+  }
+  
+  /**
+   * Verifica si una nave en movimiento colisiona con sistemas enemigos o neutrales
+   */
+  verificarColisionesDuranteMovimiento(nave: NaveEnMovimiento, index: number): void {
+    // Si la nave ya está en una misión de ataque o colonización, ignorar
+    if (nave.mision === 'atacar' || nave.mision === 'colonizar') {
+      return;
+    }
+    
+    // Verificar si ya existe un conflicto activo en la posición actual de la nave
+    const conflictoExistente = this.conflictos.find(c => 
+      Math.sqrt(
+        Math.pow(c.ubicacion.x - nave.posicionActual.x, 2) + 
+        Math.pow(c.ubicacion.y - nave.posicionActual.y, 2)
+      ) < 50 && c.estado === 'activo'
+    );
+    
+    // Si ya hay un conflicto cercano, añadir la nave a ese conflicto y detener
+    if (conflictoExistente) {
+      // Verificar si la nave ya está en los atacantes
+      const naveYaAtacando = conflictoExistente.atacantes.some(a => a.id === nave.id);
+      
+      if (!naveYaAtacando) {
+        // Añadir la nave a los atacantes del conflicto existente
+        conflictoExistente.atacantes.push({
+          tipo: nave.tipoNave, 
+          id: nave.id, 
+          hp: nave.hp || 100, 
+          attack: nave.attack || 10
+        });
+      }
+      
+      // Marcar la nave como en ataque
+      nave.mision = 'atacar';
+      return;
+    }
+    
+    const sistemas = this.juegoService.estadoJuego().systems;
+    
+    // Verificar colisiones con sistemas (radio de detección reducido: 40)
+    for (const sistema of sistemas) {
+      // Ignorar sistemas aliados para esta detección
+      if (sistema.owner === nave.owner) continue;
+      
+      const distancia = Math.sqrt(
+        Math.pow(sistema.x - nave.posicionActual.x, 2) + 
+        Math.pow(sistema.y - nave.posicionActual.y, 2)
+      );
+      
+      // Radio de detección reducido: 40 unidades
+      if (distancia <= 40) {
+        // Si el sistema es enemigo, iniciar batalla una sola vez
+        if (sistema.owner === 'enemy') {
+          console.log('¡Colisión detectada con sistema enemigo durante el movimiento!', sistema.name);
+          this.iniciarConflicto(nave, sistema);
+          
+          // Marcar la nave como en ataque para que no inicie múltiples conflictos
+          nave.mision = 'atacar';
+          
+          // Detener el movimiento
+          nave.progreso = 100;
+          nave.posicionActual = {x: sistema.x, y: sistema.y};
+          
+          // Importante: Detener el bucle para no iniciar múltiples conflictos
+          return;
+        } else if (sistema.owner === 'neutral') {
+          console.log('¡Colisión detectada con sistema neutral durante el movimiento!', sistema.name);
+          this.colonizarSistema(nave, sistema);
+          nave.mision = 'colonizar';
+          // Detener el movimiento
+          nave.progreso = 100;
+          nave.posicionActual = {x: sistema.x, y: sistema.y};
+          return;
+        }
+      }
+    }
+    
+    // Verificar colisiones con outposts enemigos (radio de detección: 40)
+    for (const outpost of this.outposts) {
+      // Ignorar outposts aliados
+      if (outpost.owner === nave.owner) continue;
+      
+      const distancia = Math.sqrt(
+        Math.pow(outpost.x - nave.posicionActual.x, 2) + 
+        Math.pow(outpost.y - nave.posicionActual.y, 2)
+      );
+      
+      if (distancia <= 40) {
+        console.log('¡Colisión detectada con outpost enemigo durante el movimiento!');
+        this.iniciarConflictoOutpost(nave, outpost);
+        nave.mision = 'atacar';
+        // Detener el movimiento
+        nave.progreso = 100;
+        nave.posicionActual = {x: outpost.x, y: outpost.y};
+        return;
+      }
+    }
+    
+    // Verificar colisiones con naves enemigas (pendiente de implementar si se requiere)
   }
   
   comprobarDestino(nave: NaveEnMovimiento, index: number): void {
@@ -1062,31 +1346,359 @@ export class GalaxiaComponent implements AfterViewInit {
   }
   
   iniciarConflicto(nave: NaveEnMovimiento, sistema: SistemaEstelar): void {
-    // Crear un nuevo conflicto
-    this.conflictos.push({
+    // Comprobar si ya existe un conflicto en la misma ubicación
+    const conflictoExistente = this.conflictos.find(c => 
+      c.ubicacion.x === sistema.x && 
+      c.ubicacion.y === sistema.y && 
+      c.estado === 'activo'
+    );
+    
+    if (conflictoExistente) {
+      // Verificar si la nave ya está en los atacantes
+      const naveYaAtacando = conflictoExistente.atacantes.some(a => a.id === nave.id);
+      
+      if (!naveYaAtacando) {
+        // Añadir la nave a los atacantes del conflicto existente
+        conflictoExistente.atacantes.push({
+          tipo: nave.tipoNave, 
+          id: nave.id, 
+          hp: nave.hp || 100, 
+          attack: nave.attack || 10
+        });
+        console.log('Nave añadida a conflicto existente:', conflictoExistente);
+      }
+      
+      // Actualizar el conflicto activo para mostrar en la UI
+      this.conflictoActivo = conflictoExistente;
+      return;
+    }
+    
+    // Si no hay conflicto existente, generar defensores aleatorios para el sistema enemigo
+    const defensores = this.generarDefensoresAleatorios(sistema);
+    
+    // Crear un nuevo conflicto con duración definida
+    const nuevoConflicto: ConflictoBatalla = {
       id: this.conflictos.length + 1,
       ubicacion: {x: sistema.x, y: sistema.y},
-      atacantes: [{tipo: nave.tipoNave, id: nave.id}],
-      defensores: [{tipo: 'sistema', id: sistema.id}],
-      estado: 'activo'
+      atacantes: [{tipo: nave.tipoNave, id: nave.id, hp: nave.hp || 100, attack: nave.attack || 10}],
+      defensores: defensores,
+      estado: 'activo',
+      nombreSistema: sistema.name || 'Sistema Desconocido',
+      // Asegurarse de que cada batalla tenga un tiempo definido
+      inicioBatalla: Date.now(),
+      duracionTotal: Math.floor(Math.random() * 210000) + 30000, // Entre 30s y 4min
+      progreso: 0
+    };
+    
+    this.conflictos.push(nuevoConflicto);
+    
+    // Mostrar el modal de batalla
+    this.conflictoActivo = nuevoConflicto;
+    console.log('Conflicto iniciado:', nuevoConflicto);
+  }
+  
+  /**
+   * Genera defensores aleatorios para un sistema enemigo
+   */
+  generarDefensoresAleatorios(sistema: SistemaEstelar): any[] {
+    const defensores = [];
+    
+    // Siempre añadir el sistema como defensor base
+    defensores.push({
+      tipo: 'sistema',
+      id: sistema.id,
+      hp: sistema.defense || 50,
+      attack: Math.floor(sistema.defense / 2) || 5,
+      nombre: sistema.name
     });
+    
+    // Calcular cuántas naves defensoras generar basado en el nivel de defensa del sistema
+    // con un límite máximo para evitar demasiadas unidades
+    const nivelDefensa = sistema.defense || 1;
+    const numDefensores = Math.min(5, Math.floor(Math.random() * 3) + Math.floor(nivelDefensa / 2));
+    
+    // Tipos posibles de naves defensoras
+    const tiposNave = ['fighter', 'bomber', 'cruiser', 'carrier'];
+    
+    // Generar defensores aleatorios
+    for (let i = 0; i < numDefensores; i++) {
+      const tipoAleatorio = tiposNave[Math.floor(Math.random() * tiposNave.length)];
+      let hp, attack;
+      
+      // Características según tipo
+      switch (tipoAleatorio) {
+        case 'fighter':
+          hp = 30 + Math.floor(Math.random() * 20);
+          attack = 8 + Math.floor(Math.random() * 5);
+          break;
+        case 'bomber':
+          hp = 40 + Math.floor(Math.random() * 30);
+          attack = 12 + Math.floor(Math.random() * 8);
+          break;
+        case 'cruiser':
+          hp = 80 + Math.floor(Math.random() * 40);
+          attack = 15 + Math.floor(Math.random() * 10);
+          break;
+        case 'carrier':
+          hp = 120 + Math.floor(Math.random() * 60);
+          attack = 20 + Math.floor(Math.random() * 15);
+          break;
+        default:
+          hp = 50;
+          attack = 10;
+      }
+      
+      defensores.push({
+        tipo: tipoAleatorio,
+        id: sistema.id * 100 + i,
+        hp: hp,
+        attack: attack
+      });
+    }
+    
+    return defensores;
   }
   
   iniciarConflictoOutpost(nave: NaveEnMovimiento, outpost: OutpostEspacial): void {
+    // Generar defensores aleatorios para el outpost enemigo
+    const defensores = this.generarDefensoresOutpost(outpost);
+    
     // Crear un nuevo conflicto
-    this.conflictos.push({
+    const nuevoConflicto: ConflictoBatalla = {
       id: this.conflictos.length + 1,
       ubicacion: {x: outpost.x, y: outpost.y},
-      atacantes: [{tipo: nave.tipoNave, id: nave.id}],
-      defensores: [{tipo: 'outpost', id: outpost.id}],
-      estado: 'activo'
-    });
+      atacantes: [{tipo: nave.tipoNave, id: nave.id, hp: nave.hp || 100, attack: nave.attack || 10}],
+      defensores: defensores,
+      estado: 'activo',
+      nombreOutpost: `Outpost Nivel ${outpost.nivel}`
+    };
+    
+    this.conflictos.push(nuevoConflicto);
+    
+    // Mostrar el modal de batalla
+    this.conflictoActivo = nuevoConflicto;
+    console.log('Conflicto con outpost iniciado:', nuevoConflicto);
   }
   
+  /**
+   * Genera defensores aleatorios para un outpost enemigo
+   */
+  generarDefensoresOutpost(outpost: OutpostEspacial): any[] {
+    const defensores = [];
+    
+    // Siempre añadir el outpost como defensor base
+    defensores.push({
+      tipo: 'outpost',
+      id: outpost.id,
+      hp: outpost.health || 100,
+      attack: Math.floor((outpost.health || 100) / 4),
+      nivel: outpost.nivel
+    });
+    
+    // Calcular cuántas naves defensoras generar basado en el nivel del outpost
+    // con un límite máximo para evitar demasiadas unidades
+    const numDefensores = Math.min(3, Math.floor(Math.random() * 2) + outpost.nivel);
+    
+    // Tipos posibles de naves defensoras (más limitados que los de los sistemas)
+    const tiposNave = ['fighter', 'bomber'];
+    
+    // Generar defensores aleatorios
+    for (let i = 0; i < numDefensores; i++) {
+      const tipoAleatorio = tiposNave[Math.floor(Math.random() * tiposNave.length)];
+      let hp, attack;
+      
+      // Características según tipo
+      if (tipoAleatorio === 'fighter') {
+        hp = 20 + Math.floor(Math.random() * 15);
+        attack = 5 + Math.floor(Math.random() * 3);
+      } else { // bomber
+        hp = 30 + Math.floor(Math.random() * 20);
+        attack = 8 + Math.floor(Math.random() * 5);
+      }
+      
+      defensores.push({
+        tipo: tipoAleatorio,
+        id: outpost.id * 100 + i,
+        hp: hp,
+        attack: attack
+      });
+    }
+    
+    return defensores;
+  }
+  
+  /**
+   * Inicia el proceso de colonización mostrando el modal de selección de naves
+   */
+  iniciarColonizacion(sistema: SistemaEstelar): void {
+    // Guardar el sistema objetivo
+    this.sistemaParaColonizar = sistema;
+    
+    // Resetear selecciones previas
+    this.navesSeleccionadasParaColonizacion = [];
+    this.navesDisponiblesParaColonizacion = [];
+    this.sistemaOrigenSeleccionado = null;
+    
+    // Mostrar el modal
+    this.modalColonizacionActivo = true;
+  }
+  
+  /**
+   * Cancela el proceso de colonización cerrando el modal
+   */
+  cancelarColonizacion(): void {
+    this.modalColonizacionActivo = false;
+    this.sistemaParaColonizar = null;
+  }
+  
+  /**
+   * Carga las naves disponibles del sistema de origen seleccionado
+   */
+  cargarNavesDisponiblesColonizacion(): void {
+    if (!this.sistemaOrigenSeleccionado) {
+      this.navesDisponiblesParaColonizacion = [];
+      return;
+    }
+    
+    // Obtener naves del sistema seleccionado
+    const estado = this.juegoService.estadoJuego();
+    this.navesDisponiblesParaColonizacion = estado.ships.filter(
+      nave => nave.location === this.sistemaOrigenSeleccionado && 
+             nave.owner === 'player' && 
+             !nave.moving
+    );
+  }
+  
+  /**
+   * Selecciona o deselecciona una nave para la colonización
+   */
+  toggleNaveParaColonizacion(naveId: number): void {
+    const index = this.navesSeleccionadasParaColonizacion.indexOf(naveId);
+    
+    if (index === -1) {
+      // Añadir nave
+      this.navesSeleccionadasParaColonizacion.push(naveId);
+    } else {
+      // Quitar nave
+      this.navesSeleccionadasParaColonizacion.splice(index, 1);
+    }
+  }
+  
+  /**
+   * Ejecuta la colonización enviando las naves seleccionadas
+   */
+  ejecutarColonizacion(): void {
+    if (!this.sistemaParaColonizar || this.navesSeleccionadasParaColonizacion.length === 0) {
+      return;
+    }
+    
+    // Obtener las naves seleccionadas
+    const estado = this.juegoService.estadoJuego();
+    const navesAEnviar = estado.ships.filter(nave => 
+      this.navesSeleccionadasParaColonizacion.includes(nave.id)
+    );
+    
+    // Enviar cada nave al destino
+    for (const nave of navesAEnviar) {
+      // Convertir la nave estática a una nave en movimiento
+      const naveMovimiento: NaveEnMovimiento = {
+        id: nave.id,
+        tipoNave: nave.type,
+        owner: nave.owner,
+        origen: {
+          x: nave.x || 0,
+          y: nave.y || 0
+        },
+        destino: {
+          x: this.sistemaParaColonizar.x,
+          y: this.sistemaParaColonizar.y
+        },
+        progreso: 0,
+        velocidad: nave.speed || 50,
+        posicionActual: {
+          x: nave.x || 0,
+          y: nave.y || 0
+        },
+        mision: this.sistemaParaColonizar.owner === 'neutral' ? 'colonizar' : 'atacar',
+        targetId: this.sistemaParaColonizar.id,
+        size: nave.size || 2,
+        hp: nave.hp,
+        attack: nave.attack
+      };
+      
+      // Añadir al registro de naves en movimiento
+      this.navesEnMovimiento.push(naveMovimiento);
+      
+      // Actualizar la nave original como en movimiento
+      nave.moving = true;
+    }
+    
+    // Guardar el nombre del sistema antes de cerrarlo
+    const nombreSistema = this.sistemaParaColonizar.name || 'destino';
+    
+    // Cerrar el modal
+    this.modalColonizacionActivo = false;
+    this.sistemaParaColonizar = null;
+    
+    // Informar al usuario
+    this.agregarMensaje(`¡${navesAEnviar.length} naves enviadas a ${nombreSistema}!`);
+  }
+  
+  /**
+   * Obtiene una lista de sistemas controlados por el jugador
+   */
+  getSistemasJugador(): SistemaEstelar[] {
+    const estado = this.juegoService.estadoJuego();
+    return estado.systems.filter(sistema => sistema.owner === 'player');
+  }
+  
+  /**
+   * Cuenta las naves disponibles en un sistema
+   */
+  contarNavesEnSistema(sistemaId: number): number {
+    const estado = this.juegoService.estadoJuego();
+    return estado.ships.filter(
+      nave => nave.location === sistemaId && 
+             nave.owner === 'player' && 
+             !nave.moving
+    ).length;
+  }
+  
+  /**
+   * Obtiene el nombre de un tipo de nave
+   */
+  getNombreNave(tipo: string): string {
+    const nombres: Record<string, string> = {
+      'fighter': 'Caza',
+      'bomber': 'Bombardero',
+      'cruiser': 'Crucero',
+      'carrier': 'Portanaves',
+      'scout': 'Explorador',
+      'destroyer': 'Destructor'
+    };
+    
+    return nombres[tipo] || tipo;
+  }
+  
+  /**
+   * Coloniza un sistema cuando una nave llega a él
+   */
   colonizarSistema(nave: NaveEnMovimiento, sistema: SistemaEstelar): void {
-    // Lógica para colonizar un sistema neutral
+    if (sistema.owner !== 'neutral') {
+      return; // Solo podemos colonizar sistemas neutrales
+    }
+    
+    // Cambiar el propietario a jugador
+    sistema.owner = 'player';
+    
+    // Establecer valores iniciales para el sistema colonizado
+    sistema.defense = Math.max(sistema.defense || 0, 5); // Mínimo de 5 de defensa
+    
+    // Añadir mensaje de log
+    this.juegoService.agregarLog(`¡Sistema ${sistema.name} colonizado exitosamente!`);
     console.log(`Colonizando sistema ${sistema.name}`);
-    // Esta lógica se implementaría completamente en el servicio de juego
+    
+    // Reproducir algún efecto visual o sonido (pendiente)
   }
   
   // Métodos para la interfaz de usuario
@@ -1211,18 +1823,33 @@ export class GalaxiaComponent implements AfterViewInit {
   
   // Método para determinar qué imagen mostrar en el modal de batalla
   getImagenBatalla(conflicto: ConflictoBatalla): string {
-    if (!conflicto) return 'assets/images/battles/fighter.png';
+    if (!conflicto || !conflicto.atacantes || conflicto.atacantes.length === 0) {
+      console.log('Sin información de conflicto para mostrar imagen');
+      return 'assets/images/battles/default-battle.png'; // Imagen por defecto
+    }
     
-    // Comprueba si hay naves grandes involucradas
-    const hayNavesGrandes = conflicto.atacantes.some(atacante => 
-      ['battleship', 'acorazado', 'dreadnought', 'capital', 'cruiser', 'crucero', 'destroyer', 'destructor']
-        .includes(atacante.tipo?.toLowerCase() || '')
-    );
-    
-    // Devuelve la imagen adecuada
-    return hayNavesGrandes
-      ? 'assets/images/battles/navegrande.png'
-      : 'assets/images/battles/fighter.png';
+    try {
+      // Comprueba si hay naves grandes involucradas
+      const tiposNavesGrandes = ['battleship', 'acorazado', 'dreadnought', 'capital', 'cruiser', 'crucero', 'destroyer', 'destructor'];
+      
+      // Verifica de forma segura accediendo a la propiedad tipo
+      const hayNavesGrandes = conflicto.atacantes.some(atacante => {
+        const tipoNave = (atacante && atacante.tipo) ? atacante.tipo.toString().toLowerCase() : '';
+        return tiposNavesGrandes.includes(tipoNave);
+      });
+      
+      // Imágenes alternativas en caso de que no existan las principales
+      const imagenNavesGrandes = 'assets/images/battles/navegrande.png';
+      const imagenNavesPequenas = 'assets/images/battles/fighter.png';
+      
+      console.log(`Tipo de batalla: ${hayNavesGrandes ? 'Naves grandes' : 'Naves pequeñas'}`);
+      
+      // Devuelve la imagen adecuada
+      return hayNavesGrandes ? imagenNavesGrandes : imagenNavesPequenas;
+    } catch (error) {
+      console.error('Error al determinar imagen de batalla:', error);
+      return 'assets/images/battles/default-battle.png'; // Imagen de respaldo
+    }
   }
   
   // Método para generar una descripción de la batalla
