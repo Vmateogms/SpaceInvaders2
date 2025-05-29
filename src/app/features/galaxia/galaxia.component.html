@@ -84,7 +84,9 @@
   <!-- PANEL DE CONTROL DE UNIDADES - Solo visible al seleccionar un planeta propio -->
   @if (seleccionActual() === 'sistema' && getSistemaSeleccionado()?.owner === 'player') {
     <div id="panel-control-unidades" 
-         style="width: 350px !important; z-index: 5000; position: fixed; right: 50px; top: 50px; border: 3px solid #3498db; background-color: rgba(0, 0, 30, 0.9); border-radius: 10px; box-shadow: 0 0 20px rgba(52, 152, 219, 0.5);">
+         (click)="$event.stopPropagation()" 
+         (mousedown)="$event.stopPropagation()" 
+         style="width: 350px !important; z-index: 9999; position: fixed; right: 50px; top: 50px; border: 3px solid #3498db; background-color: rgba(0, 0, 30, 0.9); border-radius: 10px; box-shadow: 0 0 20px rgba(52, 152, 219, 0.5);">
       <!-- Botón de cierre -->
       <div style="position: absolute; top: -15px; right: -15px; background-color: #e74c3c; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);" 
            (click)="ocultarPanelUnidades($event)">
@@ -116,12 +118,15 @@
         </div>
         
         <!-- Área de unidades con scroll -->
-        <div style="max-height: 400px; overflow-y: auto; padding-right: 10px; margin-bottom: 15px;">
+        <div 
+          (click)="$event.stopPropagation()" 
+          (mousedown)="$event.stopPropagation()" 
+          style="max-height: 400px; overflow-y: auto; padding-right: 10px; margin-bottom: 15px; position: relative; z-index: 10001;">
           @if (navesDisponiblesEnSistema().length > 0) {
             @for (nave of navesDisponiblesEnSistema(); track nave.id) {
               <button 
                 [class.seleccionada]="esNaveSeleccionada(nave)" 
-                (click)="seleccionarNaveDirecto(nave)"
+                (click)="seleccionarNaveDirecto(nave, $event)"
                 style="display: flex; width: 100%; align-items: center; cursor: pointer; padding: 15px; 
                        margin: 0 0 15px 0; border: 2px solid #444; border-radius: 8px; background-color: rgba(30, 30, 50, 0.8);
                        position: relative; z-index: 10000; text-align: left; color: white; font-family: inherit;">

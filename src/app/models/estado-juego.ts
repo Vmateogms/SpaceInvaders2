@@ -1,6 +1,7 @@
 import { Recursos } from './recursos';
 import { SistemaEstelar } from './sistema-estelar';
 import { NaveAtaque } from './nave-ataque';
+import { Edificio } from './edificio';
 
 export interface EstadoJuego {
   resources: Recursos;
@@ -9,6 +10,8 @@ export interface EstadoJuego {
   systems: SistemaEstelar[];
   ships: NaveAtaque[];
   selectedSystem: number | null;
+  buildings: Edificio[];
+  buildQueue: { id: number, tipo: 'edificio' | 'mejora', turnosRestantes: number, sistemaId: number, nombre: string }[];
   research: {
     propulsion: number;
     weapons: number;

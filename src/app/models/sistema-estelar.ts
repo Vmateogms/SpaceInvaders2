@@ -11,6 +11,9 @@ export interface SistemaEstelar {
   type: string;
   hasOutpost?: boolean;
   outpostLevel?: number; // 1-3, determina el radio de defensa
+  edificios?: number[]; // IDs de los edificios construidos
+  slotsTotales?: number; // Número máximo de edificios que se pueden construir (basado en development)
+  tieneAstillero?: boolean; // Si tiene un astillero para construir naves
 }
 
 export interface OutpostEspacial {

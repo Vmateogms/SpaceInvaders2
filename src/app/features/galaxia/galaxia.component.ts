@@ -1,6 +1,7 @@
 import { Component, inject, ElementRef, AfterViewInit, ViewChild, HostListener, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { JuegoService } from '../../services/juego.service';
+import { EnemyAiService } from '../../services/enemy-ai.service';
 import { SistemaEstelar, OutpostEspacial, NaveEnMovimiento, ConflictoBatalla } from '../../models/sistema-estelar';
 import { NaveAtaque } from '../../models/nave-ataque';
 
@@ -13,8 +14,12 @@ import { NaveAtaque } from '../../models/nave-ataque';
 })
 export class GalaxiaComponent implements AfterViewInit {
   @ViewChild('galaxyCanvas') galaxyCanvas!: ElementRef<HTMLCanvasElement>;
+  private ctx!: CanvasRenderingContext2D;
+  private juegoService = inject(JuegoService);
+  private enemyAiService = inject(EnemyAiService);
   
-  juegoService = inject(JuegoService);
+  // Signals para la selección de objetos
+  private _outpostSeleccionado = signal<number | null>(null);
   
   // Estado del mapa interactivo
   private mapWidth = 8000; // Mapa extremadamente grande
@@ -75,6 +80,9 @@ export class GalaxiaComponent implements AfterViewInit {
       canvas.height = this.viewportHeight;
     }
     
+    // Configurar eventos del canvas
+    this.configurarEventosCanvas(canvas);
+    
     // Generar estrellas de fondo (una sola vez)
     this.generarEstrellasFondo();
     
@@ -86,6 +94,82 @@ export class GalaxiaComponent implements AfterViewInit {
     
     // Centrar la vista en el sistema del jugador
     this.centrarEnSistemaJugador();
+  }
+  
+  configurarEventosCanvas(canvas: HTMLCanvasElement): void {
+    // Manejar clics en el canvas para interactuar con el mapa y sus elementos
+    canvas.addEventListener('click', (event: MouseEvent) => {
+      // Obtener las coordenadas del clic relativas al canvas
+      const rect = canvas.getBoundingClientRect();
+      const canvasX = event.clientX - rect.left;
+      const canvasY = event.clientY - rect.top;
+      
+      // Convertir a coordenadas del mundo (considerando zoom y desplazamiento)
+      const worldPos = this.viewportToWorld(canvasX, canvasY);
+      
+      // Comprobar si se hizo clic en un sistema estelar
+      const sistemaSeleccionado = this.detectarSistemaEnPosicion(worldPos.x, worldPos.y);
+      if (sistemaSeleccionado !== null) {
+        this.seleccionActual.set('sistema');
+        this.juegoService.seleccionarSistema(sistemaSeleccionado);
+        console.log('Sistema seleccionado:', this.juegoService.estadoJuego().systems[sistemaSeleccionado]);
+        return;
+      }
+      
+      // Comprobar si se hizo clic en un outpost
+      const outpostSeleccionado = this.detectarOutpostEnPosicion(worldPos.x, worldPos.y);
+      if (outpostSeleccionado !== null) {
+        this.seleccionActual.set('outpost');
+        this._outpostSeleccionado.set(outpostSeleccionado);
+        console.log('Outpost seleccionado:', this.outposts[outpostSeleccionado]);
+        return;
+      }
+      
+      // Comprobar si se hizo clic en un enemigo
+      const enemigoSeleccionado = this.detectarEnemigoEnPosicion(worldPos.x, worldPos.y);
+      if (enemigoSeleccionado) {
+        this.seleccionActual.set('enemigo');
+        this.mostrarInformacionEnemigo(enemigoSeleccionado);
+        return;
+      }
+      
+      // Si no se hizo clic en nada, deseleccionar
+      if (this.seleccionActual() !== 'ninguno') {
+        this.seleccionActual.set('ninguno');
+        // Pasando -1 en lugar de null para evitar error de tipo
+        this.juegoService.seleccionarSistema(-1); 
+        this._outpostSeleccionado.set(null);
+      }
+      
+      // Si estamos en modo colocación, registrar la posición
+      if (this.modoColocacion() !== 'ninguno') {
+        this.posicionSeleccionada.set(worldPos);
+      }
+    });
+    
+    // Evento para clic derecho (mover naves seleccionadas)
+    canvas.addEventListener('contextmenu', (event: MouseEvent) => {
+      event.preventDefault(); // Evitar que aparezca el menú contextual del navegador
+      
+      // Obtener las coordenadas del clic relativas al canvas
+      const rect = canvas.getBoundingClientRect();
+      const canvasX = event.clientX - rect.left;
+      const canvasY = event.clientY - rect.top;
+      
+      // Convertir a coordenadas del mundo
+      const worldPos = this.viewportToWorld(canvasX, canvasY);
+      
+      // Crear un objeto que simule el evento del mouse para compatibilidad
+      const mouseEvent = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        preventDefault: () => {},
+        stopPropagation: () => {}
+      } as unknown as MouseEvent;
+      
+      // Manejar el clic derecho (mover naves)
+      this.onRightClick(mouseEvent);
+    });
   }
   
   iniciarAnimacion(): void {
@@ -294,6 +378,9 @@ export class GalaxiaComponent implements AfterViewInit {
     
     // Dibujar naves en movimiento
     this.navesEnMovimiento.forEach(nave => this.dibujarNaveEnMovimiento(ctx, nave));
+    
+    // Dibujar naves enemigas (IA)
+    this.enemyAiService.dibujarEnemigos(ctx);
     
     // Dibujar conflictos/batallas
     this.conflictos.forEach(conflicto => this.dibujarConflicto(ctx, conflicto));
@@ -1167,6 +1254,102 @@ export class GalaxiaComponent implements AfterViewInit {
     return `Batalla: ${descripcion.join(', ')} vs. ${conflicto.defensores[0]?.tipo || 'Fuerzas defensoras'}`;
   }
   
+  // Método para convertir coordenadas de viewport a coordenadas del mundo
+  viewportToWorld(viewportX: number, viewportY: number): {x: number, y: number} {
+    return {
+      x: (viewportX / this.scale) + this.viewportX,
+      y: (viewportY / this.scale) + this.viewportY
+    };
+  }
+  
+  // Método para detectar si hay un sistema en una posición determinada
+  detectarSistemaEnPosicion(x: number, y: number): number | null {
+    const sistemas = this.juegoService.estadoJuego().systems;
+    const tolerancia = 30 / this.scale; // Ajustar por el nivel de zoom
+    
+    for (let i = 0; i < sistemas.length; i++) {
+      const sistema = sistemas[i];
+      const distancia = Math.sqrt(
+        Math.pow(sistema.x - x, 2) + 
+        Math.pow(sistema.y - y, 2)
+      );
+      
+      if (distancia <= tolerancia) {
+        return i; // Devolver el índice del sistema
+      }
+    }
+    
+    return null; // No se encontró ningún sistema cercano
+  }
+  
+  // Método para detectar si hay un outpost en una posición determinada
+  detectarOutpostEnPosicion(x: number, y: number): number | null {
+    const tolerancia = 20 / this.scale; // Ajustar por el nivel de zoom
+    
+    for (let i = 0; i < this.outposts.length; i++) {
+      const outpost = this.outposts[i];
+      const distancia = Math.sqrt(
+        Math.pow(outpost.x - x, 2) + 
+        Math.pow(outpost.y - y, 2)
+      );
+      
+      if (distancia <= tolerancia) {
+        return i; // Devolver el índice del outpost
+      }
+    }
+    
+    return null; // No se encontró ningún outpost cercano
+  }
+  
+  // Método para detectar si hay un enemigo en una posición determinada
+  detectarEnemigoEnPosicion(x: number, y: number): any {
+    // Obtener la lista de enemigos del servicio de IA
+    const enemigos = this.enemyAiService.getEnemigos();
+    
+    // Buscar un enemigo cerca de la posición del clic (10px de tolerancia)
+    const tolerancia = 10 / this.scale; // Ajustar por el nivel de zoom
+    
+    return enemigos.find(enemigo => {
+      const distancia = Math.sqrt(
+        Math.pow(enemigo.posX - x, 2) + 
+        Math.pow(enemigo.posY - y, 2)
+      );
+      return distancia <= tolerancia;
+    });
+  }
+
+  // Método para mostrar información sobre un enemigo seleccionado
+  mostrarInformacionEnemigo(enemigo: any): void {
+    // Crear un mensaje con la información del enemigo
+    const tipoEnemigo = enemigo.tipo === 'pirata' ? 'Pirata Espacial' : 'Defensor Planetario';
+    
+    // Mapeo seguro de estado a texto descriptivo
+    let estadoTexto = 'Desconocido';
+    switch(enemigo.estado) {
+      case 'patrullando': estadoTexto = 'Patrullando'; break;
+      case 'persiguiendo': estadoTexto = 'Persiguiendo'; break;
+      case 'atacando': estadoTexto = 'Atacando'; break;
+      case 'regresando': estadoTexto = 'Regresando a Base'; break;
+    }
+    
+    const mensaje = `🛑 ${tipoEnemigo} Detectado\n` +
+                   `ID: ${enemigo.id}\n` +
+                   `Salud: ${enemigo.hp}/${enemigo.maxHp}\n` +
+                   `Estado: ${estadoTexto}\n` +
+                   `Daño: ${enemigo.dano}\n` +
+                   `Rango: ${enemigo.rango}\n`;
+    
+    // Mostrar el mensaje en la consola y en el log del juego
+    console.log(mensaje);
+    this.juegoService.agregarLog(`⚠️ Escáner detecta ${tipoEnemigo} [HP: ${enemigo.hp}/${enemigo.maxHp}] en estado ${estadoTexto}`);
+    
+    // Si estás en estado de atacar, también podrías iniciar un combate automáticamente
+    // o mostrar un mensaje de alerta
+    if (enemigo.estado === 'atacando') {
+      this.juegoService.agregarLog(`🚨 ¡ALERTA! Enemigo hostil detectado y en modo de ataque`);
+    }
+  }
+  
   // Método para centrar la vista en el sistema del jugador
   centrarEnSistemaJugador(): void {
     const sistemas = this.juegoService.estadoJuego().systems;
@@ -1295,7 +1478,13 @@ export class GalaxiaComponent implements AfterViewInit {
   
   // VERSIÓN SUPER-DIRECTA: Método completamente simplificado para selección
   // Este método es llamado directamente desde el HTML y es más simple que el anterior
-  seleccionarNaveDirecto(nave: NaveAtaque): void {
+  seleccionarNaveDirecto(nave: NaveAtaque, event?: MouseEvent): void {
+    // Detenemos la propagación del evento para evitar problemas
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
     console.log('MÉTODO ULTRA DIRECTO - Seleccionando nave:', nave);
     
     // Variables para acceso rápido - sin usar window global

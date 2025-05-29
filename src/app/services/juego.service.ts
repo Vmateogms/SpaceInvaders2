@@ -3,6 +3,7 @@ import { EstadoJuego } from '../models/estado-juego';
 import { SistemaEstelar } from '../models/sistema-estelar';
 import { NaveAtaque } from '../models/nave-ataque';
 import { TipoNave } from '../models/tipo-nave';
+import { Edificio, TIPOS_EDIFICIOS, calcularCostoEdificio, calcularProduccionEdificio } from '../models/edificio';
 
 @Injectable({
   providedIn: 'root'
@@ -19,14 +20,14 @@ export class JuegoService {
 
   // Tipos de naves disponibles
   public readonly tiposNave: Record<string, TipoNave> = {
-    scout: { cost: {energy: 50, materials: 20}, hp: 30, attack: 10, speed: 3, icon: '🔍', special: 'exploration' },
-    fighter: { cost: {energy: 100, materials: 50}, hp: 60, attack: 25, speed: 2, icon: '⚔️', special: 'combat' },
-    cruiser: { cost: {energy: 200, materials: 100}, hp: 120, attack: 50, speed: 1, icon: '🚢', special: 'heavy' },
-    colony: { cost: {energy: 300, materials: 200, crystals: 50}, hp: 80, attack: 5, speed: 1, icon: '🏴', special: 'colonize' },
-    carrier: { cost: {energy: 400, materials: 300, crystals: 100}, hp: 200, attack: 30, speed: 1, icon: '🛸', special: 'support' },
-    stealth: { cost: {energy: 250, materials: 150, intel: 50}, hp: 40, attack: 35, speed: 3, icon: '👻', special: 'stealth' },
-    titan: { cost: {energy: 800, materials: 600, crystals: 200}, hp: 400, attack: 100, speed: 1, icon: '🏰', special: 'fortress' },
-    mining: { cost: {energy: 200, materials: 250}, hp: 100, attack: 5, speed: 1, icon: '⛏️', special: 'mining' }
+    scout: { cost: {energy: 50, materials: 20}, hp: 30, attack: 10, speed: 3, icon: '', special: 'exploration' },
+    fighter: { cost: {energy: 100, materials: 50}, hp: 60, attack: 25, speed: 2, icon: '', special: 'combat' },
+    cruiser: { cost: {energy: 200, materials: 100}, hp: 120, attack: 50, speed: 1, icon: '', special: 'heavy' },
+    colony: { cost: {energy: 300, materials: 200, crystals: 50}, hp: 80, attack: 5, speed: 1, icon: '', special: 'colonize' },
+    carrier: { cost: {energy: 400, materials: 300, crystals: 100}, hp: 200, attack: 30, speed: 1, icon: '', special: 'support' },
+    stealth: { cost: {energy: 250, materials: 150, intel: 50}, hp: 40, attack: 35, speed: 3, icon: '', special: 'stealth' },
+    titan: { cost: {energy: 800, materials: 600, crystals: 200}, hp: 400, attack: 100, speed: 1, icon: '', special: 'fortress' },
+    mining: { cost: {energy: 200, materials: 250}, hp: 100, attack: 5, speed: 1, icon: '', special: 'mining' }
   };
 
   // Estado del juego usando signals para reactividad
@@ -37,6 +38,8 @@ export class JuegoService {
     systems: [],
     ships: [],
     selectedSystem: null,
+    buildings: [], // Lista de todos los edificios construidos
+    buildQueue: [], // Cola de construcción
     research: { propulsion: 0, weapons: 0, shields: 0, espionage: 0, terraforming: 0, quantum: 0 },
     autoPlay: false,
     enemies: [],
@@ -102,7 +105,10 @@ export class JuegoService {
       resources: 200,
       development: 3,
       defense: 100,
-      type: 'blue'
+      type: 'blue',
+      edificios: [],
+      slotsTotales: 8,
+      tieneAstillero: false
     };
     
     estado.systems.push(sistemaJugador);
@@ -204,48 +210,68 @@ export class JuegoService {
     this.estadoJuego.set(estado);
   }
 
-  construirNave(tipo: string): boolean {
-    const tipoNave = this.tiposNave[tipo];
-    if (!tipoNave) return false;
-    
+  construirNave(tipoNave: string): boolean {
     const estado = this.estadoJuego();
     
-    // Comprobar si podemos pagar la nave
-    if (!this.puedeComprar(tipoNave.cost)) {
+    // Verificar si el tipo es válido
+    if (!this.tiposNave[tipoNave]) {
+      return false;
+    }
+    
+    // Verificar si hay sistema seleccionado
+    if (estado.selectedSystem === null) {
+      return false;
+    }
+    
+    const sistemaSeleccionado = estado.systems[estado.selectedSystem];
+    
+    // Temporalmente hacemos el astillero opcional hasta implementar la interfaz de edificios
+    /*
+    // Verificar que el sistema tenga un astillero
+    if (!sistemaSeleccionado.tieneAstillero) {
+      this.agregarLog(`❌ No puedes construir naves en ${sistemaSeleccionado.name} sin un astillero`);
+      return false;
+    }
+    */
+    
+    // Verificar costos
+    const costoNave = this.tiposNave[tipoNave].cost;
+    if (!this.puedeComprar(costoNave)) {
       return false;
     }
     
     // Gastar recursos
-    this.gastarRecursos(tipoNave.cost);
+    this.gastarRecursos(costoNave);
     
     // Crear la nave
     const nuevaNave: NaveAtaque = {
       id: Date.now(),
-      type: tipo,
-      hp: tipoNave.hp,
-      maxHp: tipoNave.hp,
-      attack: tipoNave.attack,
-      speed: tipoNave.speed,
-      location: 0, // Sistema inicial por defecto
+      type: tipoNave,
+      hp: this.tiposNave[tipoNave].hp,
+      attack: this.tiposNave[tipoNave].attack,
+      owner: 'player',
+      x: sistemaSeleccionado.x,
+      y: sistemaSeleccionado.y,
+      speed: this.tiposNave[tipoNave].speed,
       moving: false,
-      owner: 'player' // El jugador es dueño de las naves que construye
+      size: 2 // Tamaño predeterminado
     };
     
     estado.ships.push(nuevaNave);
-    this.estadoJuego.set(estado);
     
-    this.agregarLog(`🚀 ${tipo} construido exitosamente!`);
+    this.agregarLog(`🚀 Nave ${tipoNave} construida en ${sistemaSeleccionado.name}`);
+    this.estadoJuego.set(estado);
     return true;
   }
 
-  puedeComprar(costos: Partial<Record<string, number>>): boolean {
+  puedeComprar(costos: Partial<Record<string, number>> | { energy: number, materials: number, crystals?: number }): boolean {
     const estado = this.estadoJuego();
     return Object.entries(costos).every(([recurso, cantidad]) => 
       cantidad !== undefined && estado.resources[recurso as keyof typeof estado.resources] >= cantidad
     );
   }
 
-  gastarRecursos(costos: Partial<Record<string, number>>): void {
+  gastarRecursos(costos: Partial<Record<string, number>> | { energy: number, materials: number, crystals?: number }): void {
     const estado = this.estadoJuego();
     
     Object.entries(costos).forEach(([recurso, cantidad]) => {
@@ -260,33 +286,63 @@ export class JuegoService {
 
   siguienteTurno(): void {
     const estado = this.estadoJuego();
-    estado.turn++;
+    estado.turn += 1;
     
-    // Generar recursos
-    let energyIncome = 50;
-    let materialsIncome = 20;
-    let crystalsIncome = 5;
+    // Generar recursos de sistemas controlados
+    let energiaGenerada = 0;
+    let materialesGenerados = 0;
+    let cristalesGenerados = 0;
+    let poblacionGenerada = 0;
+    let investigacionGenerada = 0;
     
-    estado.systems.filter(s => s.owner === 'player').forEach(system => {
-      energyIncome += system.development * 20;
-      materialsIncome += system.resources * 0.5;
-      crystalsIncome += system.development * 2;
+    estado.systems.forEach(sistema => {
+      if (sistema.owner === 'player') {
+        // Recursos base por sistema
+        const baseEnergia = 5 + (sistema.development * 2);
+        const baseMateriales = 3 + sistema.development;
+        const baseCristales = sistema.resources > 100 ? 1 : 0;
+        const basePoblacion = Math.floor(sistema.population * 0.02); // Crecimiento del 2%
+        
+        energiaGenerada += baseEnergia;
+        materialesGenerados += baseMateriales;
+        cristalesGenerados += baseCristales;
+        poblacionGenerada += basePoblacion;
+        
+        // Actualizar población del sistema
+        sistema.population += basePoblacion;
+        
+        // Recursos adicionales de edificios
+        if (sistema.edificios && sistema.edificios.length > 0) {
+          sistema.edificios.forEach(edificioId => {
+            const edificio = estado.buildings.find(b => b.id === edificioId);
+            if (edificio && edificio.produccion) {
+              if (edificio.produccion.energy) energiaGenerada += edificio.produccion.energy;
+              if (edificio.produccion.materials) materialesGenerados += edificio.produccion.materials;
+              if (edificio.produccion.crystals) cristalesGenerados += edificio.produccion.crystals;
+              if (edificio.produccion.research) investigacionGenerada += edificio.produccion.research;
+            }
+          });
+        }
+      }
     });
     
-    estado.resources.energy += energyIncome;
-    estado.resources.materials += materialsIncome;
-    estado.resources.crystals += crystalsIncome;
+    // Actualizar recursos
+    estado.resources.energy += energiaGenerada;
+    estado.resources.materials += materialesGenerados;
+    estado.resources.crystals += cristalesGenerados;
+    estado.resources.population += poblacionGenerada;
+    estado.resources.intel += investigacionGenerada;
     
-    // IA enemiga
-    this.procesarIAEnemiga();
+    // Procesar cola de construcción
+    this.procesarColaConstruccion();
     
-    // Eventos aleatorios
-    if (Math.random() < 0.1) {
-      this.dispararEventoAleatorioPositivo();
+    // Verificar eventos aleatorios
+    if (Math.random() < 0.1) { // 10% de probabilidad de evento negativo
+      this.dispararEventoAleatorioNegativo();
     }
     
-    if (Math.random() < 0.1) {
-      this.dispararEventoAleatorioNegativo();
+    if (Math.random() < 0.07) { // 7% de probabilidad de evento positivo
+      this.dispararEventoAleatorioPositivo();
     }
     
     this.estadoJuego.set(estado);
@@ -561,5 +617,292 @@ export class JuegoService {
       case 'enemy': return 'Enemigo';
       default: return 'Desconocido';
     }
+  }
+  
+  // Métodos para la IA enemiga
+  
+  // Devuelve el tamaño del mapa para cálculos de IA
+  getMapSize(): { width: number, height: number } {
+    return { width: 8000, height: 6000 }; // Mismo tamaño definido en generarGalaxia
+  }
+  
+  // Obtiene todas las naves del jugador para la IA enemiga
+  getNavesJugador(): NaveAtaque[] {
+    return this.estadoJuego().ships.filter(nave => nave.owner === 'player');
+  }
+  
+  // Crear un conflicto/batalla entre naves
+  crearConflicto(conflicto: {
+    atacantes: { id: string, tipo: string, hp: number }[],
+    defensores: { id: string, tipo: string, hp: number }[],
+    posX: number,
+    posY: number
+  }): void {
+    // Emitir evento de conflicto para que el componente de galaxia lo maneje
+    console.log('Conflicto creado:', conflicto);
+    // Aquí se podría usar un EventEmitter o un servicio de eventos para notificar
+    // Por ahora, solo registramos en el log
+    this.agregarLog(`⚡ Conflicto detectado: ${conflicto.atacantes.length} atacante(s) contra ${conflicto.defensores.length} defensor(es)`);
+  }
+  
+  // Dañar una nave del jugador
+  dañarNave(naveId: string, daño: number): void {
+    const estado = this.estadoJuego();
+    const nave = estado.ships.find(n => n.id.toString() === naveId);
+    
+    if (nave) {
+      nave.hp = Math.max(0, nave.hp - daño);
+      
+      // Si la nave es destruida
+      if (nave.hp <= 0) {
+        this.agregarLog(`💥 Nave ${nave.type} (ID: ${nave.id}) ha sido destruida en combate`);
+        estado.ships = estado.ships.filter(n => n.id !== nave.id);
+      } else {
+        this.agregarLog(`🔥 Nave ${nave.type} (ID: ${nave.id}) ha recibido ${daño} puntos de daño`);
+      }
+      
+      this.estadoJuego.set(estado);
+    }
+  }
+  
+  // Métodos para la gestión de edificios
+  
+  construirEdificio(tipoEdificio: string): boolean {
+    const estado = this.estadoJuego();
+    
+    // Verificar si hay un sistema seleccionado
+    if (estado.selectedSystem === null) {
+      return false;
+    }
+    
+    const sistema = estado.systems[estado.selectedSystem];
+    
+    // Verificar si el sistema es del jugador
+    if (sistema.owner !== 'player') {
+      this.agregarLog(`❌ No puedes construir en un sistema que no te pertenece`);
+      return false;
+    }
+    
+    // Verificar si hay slots disponibles
+    if (!sistema.edificios) sistema.edificios = [];
+    if (!sistema.slotsTotales) sistema.slotsTotales = sistema.development * 2 + 2;
+    
+    if (sistema.edificios.length >= sistema.slotsTotales) {
+      this.agregarLog(`❌ No hay slots disponibles en ${sistema.name}. Mejora el desarrollo para obtener más slots.`);
+      return false;
+    }
+    
+    // Verificar si el tipo de edificio existe
+    if (!TIPOS_EDIFICIOS[tipoEdificio]) {
+      return false;
+    }
+    
+    // Verificar si el sistema cumple los requisitos para el edificio
+    const edificioInfo = TIPOS_EDIFICIOS[tipoEdificio];
+    if (edificioInfo.requiereNivel && sistema.development < edificioInfo.requiereNivel) {
+      this.agregarLog(`❌ ${sistema.name} necesita nivel de desarrollo ${edificioInfo.requiereNivel} para construir ${edificioInfo.nombre}`);
+      return false;
+    }
+    
+    // Calcular costo basado en el nivel de desarrollo
+    const costo = calcularCostoEdificio(tipoEdificio);
+    
+    // Verificar si hay recursos suficientes
+    if (!this.puedeComprar(costo)) {
+      this.agregarLog(`❌ Recursos insuficientes para construir ${edificioInfo.nombre}`);
+      return false;
+    }
+    
+    // Gastar recursos
+    this.gastarRecursos(costo);
+    
+    // Crear el edificio
+    const nuevoEdificio: Edificio = {
+      id: Date.now(),
+      tipo: tipoEdificio as any,
+      nivel: 1,
+      sistemaId: sistema.id,
+      produccion: calcularProduccionEdificio(tipoEdificio),
+      defensa: edificioInfo.defensa,
+      icono: edificioInfo.icono
+    };
+    
+    // Añadir a la lista de edificios
+    estado.buildings.push(nuevoEdificio);
+    sistema.edificios.push(nuevoEdificio.id);
+    
+    // Si es un astillero, actualizar la propiedad del sistema
+    if (tipoEdificio === 'astillero') {
+      sistema.tieneAstillero = true;
+    }
+    
+    // Si es una defensa, actualizar la defensa del sistema
+    if (tipoEdificio === 'defensa') {
+      sistema.defense += nuevoEdificio.defensa || 0;
+    }
+    
+    this.agregarLog(`🏗️ ${edificioInfo.nombre} en construcción en ${sistema.name}`);
+    
+    // Añadir a la cola de construcción (3 turnos para completarse)
+    estado.buildQueue.push({
+      id: nuevoEdificio.id,
+      tipo: 'edificio',
+      turnosRestantes: 3,
+      sistemaId: sistema.id,
+      nombre: edificioInfo.nombre
+    });
+    
+    this.estadoJuego.set(estado);
+    return true;
+  }
+  
+  mejorarEdificio(edificioId: number): boolean {
+    const estado = this.estadoJuego();
+    const edificio = estado.buildings.find(e => e.id === edificioId);
+    
+    if (!edificio) {
+      return false;
+    }
+    
+    const sistema = estado.systems.find(s => s.id === edificio.sistemaId);
+    if (!sistema || sistema.owner !== 'player') {
+      return false;
+    }
+    
+    // Máximo nivel 3
+    if (edificio.nivel >= 3) {
+      this.agregarLog(`❌ ${TIPOS_EDIFICIOS[edificio.tipo].nombre} ya está al nivel máximo`);
+      return false;
+    }
+    
+    // Calcular costo de mejora (150% del costo base)
+    const costoMejora = calcularCostoEdificio(edificio.tipo, edificio.nivel + 1);
+    
+    // Verificar recursos
+    if (!this.puedeComprar(costoMejora)) {
+      this.agregarLog(`❌ Recursos insuficientes para mejorar ${TIPOS_EDIFICIOS[edificio.tipo].nombre}`);
+      return false;
+    }
+    
+    // Gastar recursos
+    this.gastarRecursos(costoMejora);
+    
+    // Añadir a la cola de construcción (2 turnos para completarse)
+    estado.buildQueue.push({
+      id: edificio.id,
+      tipo: 'mejora',
+      turnosRestantes: 2,
+      sistemaId: sistema.id,
+      nombre: TIPOS_EDIFICIOS[edificio.tipo].nombre
+    });
+    
+    this.agregarLog(`🔧 Mejorando ${TIPOS_EDIFICIOS[edificio.tipo].nombre} en ${sistema.name} a nivel ${edificio.nivel + 1}`);
+    
+    this.estadoJuego.set(estado);
+    return true;
+  }
+  
+  demolerEdificio(edificioId: number): boolean {
+    const estado = this.estadoJuego();
+    const edificio = estado.buildings.find(e => e.id === edificioId);
+    
+    if (!edificio) {
+      return false;
+    }
+    
+    const sistema = estado.systems.find(s => s.id === edificio.sistemaId);
+    if (!sistema || sistema.owner !== 'player') {
+      return false;
+    }
+    
+    // Eliminar el edificio
+    estado.buildings = estado.buildings.filter(e => e.id !== edificioId);
+    sistema.edificios = sistema.edificios?.filter(id => id !== edificioId) || [];
+    
+    // Si era un astillero, actualizar la propiedad del sistema
+    if (edificio.tipo === 'astillero') {
+      // Verificar si aún queda algún astillero
+      const aúnTieneAstillero = sistema.edificios?.some(id => {
+        const edif = estado.buildings.find(e => e.id === id);
+        return edif?.tipo === 'astillero';
+      });
+      
+      sistema.tieneAstillero = aúnTieneAstillero || false;
+    }
+    
+    // Si era una defensa, actualizar la defensa del sistema
+    if (edificio.tipo === 'defensa') {
+      sistema.defense -= edificio.defensa || 0;
+    }
+    
+    this.agregarLog(`🧨 ${TIPOS_EDIFICIOS[edificio.tipo].nombre} demolido en ${sistema.name}`);
+    
+    this.estadoJuego.set(estado);
+    return true;
+  }
+  
+  procesarColaConstruccion(): void {
+    const estado = this.estadoJuego();
+    
+    // Procesar cada item en la cola
+    const nuevaCola = [];
+    
+    for (const item of estado.buildQueue) {
+      item.turnosRestantes--;
+      
+      if (item.turnosRestantes <= 0) {
+        // Construcción completada
+        if (item.tipo === 'edificio') {
+          const edificio = estado.buildings.find(e => e.id === item.id);
+          const sistema = estado.systems.find(s => s.id === item.sistemaId);
+          
+          if (edificio && sistema) {
+            this.agregarLog(`✅ ${item.nombre} completado en ${sistema.name}`);
+          }
+        } 
+        else if (item.tipo === 'mejora') {
+          const edificio = estado.buildings.find(e => e.id === item.id);
+          const sistema = estado.systems.find(s => s.id === item.sistemaId);
+          
+          if (edificio && sistema) {
+            edificio.nivel++;
+            edificio.produccion = calcularProduccionEdificio(edificio.tipo, edificio.nivel);
+            
+            // Si es una defensa, actualizar la defensa del sistema
+            if (edificio.tipo === 'defensa') {
+              // Calcular nuevo valor de defensa
+              const defensaAnterior = edificio.defensa || 0;
+              const tipoInfo = TIPOS_EDIFICIOS[edificio.tipo];
+              edificio.defensa = tipoInfo && tipoInfo.defensa ? 
+                tipoInfo.defensa * Math.pow(1.5, edificio.nivel - 1) : 0;
+              
+              // Actualizar defensa del sistema
+              sistema.defense = sistema.defense - defensaAnterior + (edificio.defensa || 0);
+            }
+            
+            this.agregarLog(`✅ ${item.nombre} mejorado a nivel ${edificio.nivel} en ${sistema.name}`);
+          }
+        }
+      } else {
+        // Aún no completado, mantener en la cola
+        nuevaCola.push(item);
+      }
+    }
+    
+    estado.buildQueue = nuevaCola;
+    this.estadoJuego.set(estado);
+  }
+  
+  getEdificiosSistema(sistemaId: number): Edificio[] {
+    const estado = this.estadoJuego();
+    const sistema = estado.systems.find(s => s.id === sistemaId);
+    
+    if (!sistema || !sistema.edificios) {
+      return [];
+    }
+    
+    return sistema.edificios
+      .map(id => estado.buildings.find(e => e.id === id))
+      .filter(e => e !== undefined) as Edificio[];
   }
 }
