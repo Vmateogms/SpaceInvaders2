@@ -1,0 +1,217 @@
+<div class="galaxy-container">
+  <!-- Mapa principal -->
+  <canvas #galaxyCanvas width="100%" height="100%"></canvas>
+  
+  <!-- Controles del mapa -->
+  <div class="map-controls">
+    <button class="control-btn" (click)="modoColocacion.set('outpost')">
+      <i class="fas fa-satellite"></i> Colocar Outpost
+    </button>
+    <button class="control-btn" (click)="mostrarControlesMapa = !mostrarControlesMapa">
+      <i class="fas fa-info-circle"></i> Ayuda
+    </button>
+  </div>
+  
+  <!-- Panel de información -->
+  @if (seleccionActual() === 'sistema') {
+    <div class="info-panel sistema-panel">
+      @if (getSistemaSeleccionado(); as sistema) {
+        <h3>{{ sistema.name }}</h3>
+        <div class="sistema-info">
+          <p><strong>Propietario:</strong> {{ sistema.owner === 'player' ? 'Tu Imperio' : sistema.owner === 'enemy' ? 'Enemigo' : 'Neutral' }}</p>
+          <p><strong>Recursos:</strong> {{ sistema.resources }}</p>
+          <p><strong>Población:</strong> {{ sistema.population }}</p>
+          <p><strong>Defensa:</strong> {{ sistema.defense }}</p>
+          
+          @if (sistema.owner === 'player') {
+            <div class="actions">
+              <button class="action-btn" (click)="seleccionarNaveParaEnviar(sistema.id)">
+                Enviar Flota
+              </button>
+              <button class="action-btn" (click)="upgradeDefensa(sistema.id)">
+                Mejorar Defensa
+              </button>
+              @if (!sistema.hasOutpost) {
+                <button class="action-btn" (click)="construirOutpost(sistema.id)">
+                  Construir Outpost
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+  } @else if (seleccionActual() === 'outpost') {
+    <div class="info-panel outpost-panel">
+      @if (getOutpostSeleccionado(); as outpost) {
+        <h3>Outpost Nivel {{ outpost.nivel }}</h3>
+        <div class="outpost-info">
+          <p><strong>Salud:</strong> {{ outpost.health }}/100</p>
+          <p><strong>Rango de defensa:</strong> {{ outpost.rangoDefensa }}</p>
+          
+          @if (outpost.owner === 'player') {
+            <div class="actions">
+              <button class="action-btn" (click)="mejorarOutpost(outpost.id)">
+                Mejorar (Nivel {{ outpost.nivel + 1 }})
+              </button>
+              <button class="action-btn" (click)="repararOutpost(outpost.id)">
+                Reparar
+              </button>
+              <button class="action-btn danger" (click)="destruirOutpost(outpost.id)">
+                Destruir
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  } @else if (seleccionActual() === 'espacio') {
+    <div class="info-panel espacio-panel">
+      <h3>Espacio Profundo</h3>
+      <p>Coordenadas: ({{ Math.round(posicionSeleccionada()?.x || 0) }}, {{ Math.round(posicionSeleccionada()?.y || 0) }})</p>
+      
+      <div class="actions">
+        <button class="action-btn" (click)="modoColocacion.set('outpost')">
+          Construir Outpost
+        </button>
+        <button class="action-btn" [disabled]="!hayNavesDisponibles()">
+          Mover Flota Aquí
+        </button>
+      </div>
+    </div>
+  }
+  
+  <!-- PANEL DE CONTROL DE UNIDADES -->
+  <div id="panel-control-unidades" style="width: 350px !important; z-index: 5000; position: fixed; right: 50px; top: 50px; border: 3px solid #3498db; background-color: rgba(0, 0, 30, 0.9); border-radius: 10px; box-shadow: 0 0 20px rgba(52, 152, 219, 0.5);">
+    <!-- Cabecera del panel -->
+    <div class="panel-header" style="background-color: #2c3e50; padding: 15px; border-bottom: 2px solid #3498db; border-radius: 7px 7px 0 0;">
+      <h3 style="font-size: 22px; color: white; text-shadow: 0 0 5px #3498db; margin: 0 0 10px 0;">Control de Unidades</h3>
+      <div style="margin-top: 10px; display: flex; justify-content: space-between;">
+        <button (click)="seleccionarTodasLasNaves()" style="flex: 1; padding: 12px 15px; background-color: #2980b9; border: none; color: white; margin-right: 10px; cursor: pointer; border-radius: 5px; font-weight: bold;">
+          <span style="font-size: 18px;">🔘</span> Seleccionar todas
+        </button>
+        <button (click)="deseleccionarTodasLasNaves()" style="flex: 1; padding: 12px 15px; background-color: #7f8c8d; border: none; color: white; cursor: pointer; border-radius: 5px; font-weight: bold;">
+          <span style="font-size: 18px;">⚪</span> Deseleccionar
+        </button>
+      </div>
+    </div>
+    
+    <!-- Contenedor principal -->
+    <div style="padding: 15px;">
+      <!-- Panel de depuración -->
+      <div style="border: 2px solid red; padding: 8px; margin-bottom: 15px; color: white; font-weight: bold; text-align: center; background-color: rgba(255, 0, 0, 0.2);">
+        Naves disponibles: {{ navesDisponiblesEnSistema().length }} | 
+        Naves seleccionadas: {{ navesSeleccionadas().length }}
+      </div>
+      
+      <!-- Área de unidades con scroll -->
+      <div style="max-height: 400px; overflow-y: auto; padding-right: 10px; margin-bottom: 15px;">
+        @if (navesDisponiblesEnSistema().length > 0) {
+          @for (nave of navesDisponiblesEnSistema(); track nave.id) {
+            <button 
+              [class.seleccionada]="esNaveSeleccionada(nave)" 
+              (click)="seleccionarNaveDirecto(nave)"
+              style="display: flex; width: 100%; align-items: center; cursor: pointer; padding: 15px; 
+                     margin: 0 0 15px 0; border: 2px solid #444; border-radius: 8px; background-color: rgba(30, 30, 50, 0.8);
+                     position: relative; z-index: 10000; text-align: left; color: white; font-family: inherit;">
+              <div style="font-size: 30px; margin-right: 15px; width: 40px; text-align: center;">
+                {{ nave.type === 'fighter' ? '⚔️' : nave.type === 'scout' ? '🔍' : nave.type === 'cruiser' ? '🚢' : '🛸' }}
+              </div>
+              <div style="flex: 1;">
+                <div style="font-weight: bold; font-size: 16px;">{{ nave.type | uppercase }}</div>
+                <div style="font-size: 12px; color: #3498db;">ID: {{ nave.id }}</div>
+                <div style="margin-top: 5px;">HP: {{ nave.hp }}/{{ nave.maxHp }}</div>
+              </div>
+            </button>
+          }
+        } @else {
+          <div style="padding: 30px 15px; text-align: center; color: #aaa; background-color: rgba(0, 0, 0, 0.3); border-radius: 8px;">
+            <div style="font-size: 30px; margin-bottom: 10px;">🚨</div>
+            <div>No hay unidades disponibles en este sistema</div>
+          </div>
+        }
+      </div>
+      
+      <!-- Instrucciones -->
+      <div style="padding: 10px; background-color: rgba(52, 152, 219, 0.2); border-radius: 5px; text-align: center; color: white; margin-bottom: 10px;">
+        Selecciona una unidad y luego haz clic derecho en el mapa para moverla
+      </div>
+      
+      <!-- Estado actual -->
+      <div style="padding: 8px; color: #aaa; text-align: center; font-size: 14px;">
+        {{ navesSeleccionadas().length > 0 ? navesSeleccionadas().length + ' unidades seleccionadas' : 'No hay unidades seleccionadas' }}
+      </div>
+    </div>
+  </div>
+  
+  <!-- Diálogo de confirmación de movimiento siempre visible (simplificado) -->
+  <div class="confirmacion-movimiento" [style.display]="mostrarConfirmacionMovimiento() ? 'flex' : 'none'" 
+       (click)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()" (contextmenu)="$event.preventDefault(); $event.stopPropagation()">
+    <div class="confirmacion-contenido" (click)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()">
+      <h3>¿Mover {{ navesSeleccionadas().length === 1 ? 'unidad' : navesSeleccionadas().length + ' unidades' }}?</h3>
+      <p>Coordenadas: ({{ Math.round(posicionSeleccionada()?.x || 0) }}, {{ Math.round(posicionSeleccionada()?.y || 0) }})</p>
+      <div class="confirmacion-botones">
+        <button class="action-btn" (click)="moverSeleccionDirectamente($event)">Sí, mover</button>
+        <button class="action-btn secondary" (click)="cancelarMovimiento($event)">Cancelar</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Pantalla de batallas (Modal) -->
+  @if (conflictoActivo) {
+    <div class="modal-batalla">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>¡Batalla en curso!</h2>
+          <button class="close-btn" (click)="cerrarModalBatalla()">&times;</button>
+        </div>
+        <div class="batalla-info">
+          <div class="batalla-imagen">
+            <!-- Aquí iría la imagen de la batalla -->
+            <div class="batalla-placeholder">Imagen de Batalla</div>
+          </div>
+          <div class="fuerzas-container">
+            <div class="fuerzas atacantes">
+              <h3>Fuerzas Atacantes</h3>
+              <ul>
+                @for (atacante of conflictoActivo.atacantes; track atacante.id) {
+                  <li>{{ atacante.tipo || 'Nave desconocida' }}</li>
+                }
+              </ul>
+            </div>
+            <div class="fuerzas defensoras">
+              <h3>Fuerzas Defensoras</h3>
+              <ul>
+                @for (defensor of conflictoActivo.defensores; track defensor.id) {
+                  <li>{{ defensor.tipo || 'Defensa desconocida' }}</li>
+                }
+              </ul>
+            </div>
+          </div>
+          <div class="batalla-resultado" *ngIf="conflictoActivo.resultados">
+            <h3>Resultado</h3>
+            <p>Ganador: {{ conflictoActivo.resultados.ganador }}</p>
+            <p>Bajas atacantes: {{ conflictoActivo.resultados.navesPerdidasAtacante }}</p>
+            <p>Bajas defensoras: {{ conflictoActivo.resultados.navesPerdidasDefensor }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+  
+  <!-- Indicaciones de ayuda -->
+  @if (mostrarControlesMapa) {
+    <div class="help-overlay">
+      <div class="help-content">
+        <h3>Controles del Mapa</h3>
+        <ul>
+          <li><strong>Clic izquierdo:</strong> Seleccionar sistema/outpost/espacio</li>
+          <li><strong>Clic derecho:</strong> Mover nave seleccionada</li>
+          <li><strong>Rueda del ratón:</strong> Zoom in/out</li>
+          <li><strong>Arrastrar (clic central o derecho):</strong> Mover el mapa</li>
+        </ul>
+        <button class="close-btn" (click)="mostrarControlesMapa = false">Cerrar</button>
+      </div>
+    </div>
+  }
+</div>

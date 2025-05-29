@@ -1,0 +1,118 @@
+<div class="game-container">
+  <!-- Cabecera con recursos -->
+  <div class="header">
+    <div class="title">SPACE INVADERS 2</div>
+    <div class="resources">
+      <div class="resource">⚡ {{ juegoService.estadoJuego().resources.energy }}</div>
+      <div class="resource">🔩 {{ juegoService.estadoJuego().resources.materials }}</div>
+      <div class="resource">💎 {{ juegoService.estadoJuego().resources.crystals }}</div>
+      <div class="resource">👥 {{ juegoService.estadoJuego().resources.population }}</div>
+      <div class="resource">🕵️ {{ juegoService.estadoJuego().resources.intel }}</div>
+      <div class="resource">🎭 {{ juegoService.estadoJuego().resources.influence }}</div>
+      <div class="resource">🌟 {{ juegoService.estadoJuego().score }}</div>
+    </div>
+  </div>
+
+  <!-- Barra lateral izquierda desplegable -->
+  <div class="sidebar collapsible">
+    <div class="section">
+      <h3>🏭 Construcción</h3>
+      <button class="btn" (click)="construirNave('scout')">Scout (E:50 M:20)</button>
+      <button class="btn" (click)="construirNave('fighter')">Fighter (E:100 M:50)</button>
+      <button class="btn" (click)="construirNave('cruiser')">Cruiser (E:200 M:100)</button>
+      <button class="btn" (click)="construirNave('colony')">Colonia (E:300 M:200 C:50)</button>
+      <button class="btn" (click)="construirNave('carrier')">Carrier (E:400 M:300 C:100)</button>
+      <button class="btn" (click)="construirNave('stealth')">Stealth (E:250 M:150 I:50)</button>
+      <button class="btn" (click)="construirNave('mining')">Minero (E:200 M:250)</button>
+    </div>
+    
+    <div class="section">
+      <h3>👷️ Estaciones</h3>
+      <button class="btn" (click)="construirEstacion('mining')">
+        Minera (E:300 M:400)
+      </button>
+      <button class="btn" (click)="construirEstacion('defense')">
+        Defensa (E:500 M:600)
+      </button>
+      <button class="btn" (click)="construirEstacion('research')">
+        Laboratorio (E:400 M:200 C:100)
+      </button>
+    </div>
+    
+    <div class="section">
+      <h3>👥 Héroes</h3>
+      <button class="btn" (click)="reclutarHeroe('admiral')">
+        Almirante (I:100)
+      </button>
+      <button class="btn" (click)="reclutarHeroe('scientist')">
+        Científico (I:80)
+      </button>
+      <button class="btn" (click)="reclutarHeroe('spy')">
+        Espía (I:90)
+      </button>
+      <div id="heroes-list"></div>
+    </div>
+    
+    <div class="section">
+      <h3>🔬 Investigación</h3>
+      <div>
+        <div>Propulsión Avanzada</div>
+        <div class="progress-bar">
+          <div class="progress-fill" 
+               [style.width.%]="juegoService.estadoJuego().research.propulsion"></div>
+        </div>
+        <button class="btn" (click)="juegoService.investigar('propulsion')">
+          Investigar (C:30)
+        </button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>📊 Imperio</h3>
+      <div>Sistemas: {{ contarSistemasJugador() }}</div>
+      <div>Flota: {{ juegoService.estadoJuego().ships.length }}</div>
+      <div>Producción/turno:</div>
+      <div style="font-size: 10px;">
+        ⚡ +100
+        🔩 +50
+        💎 +10
+      </div>
+    </div>
+  </div>
+
+  <!-- Mapa de la galaxia -->
+  <app-galaxia class="galaxy-map"></app-galaxia>
+
+  <!-- Panel de información derecho -->
+  <app-info-sistema class="info-panel"></app-info-sistema>
+
+  <!-- Panel de control (esquina superior derecha) -->
+  <div class="control-panel-corner">
+    <div class="menu-toggle">
+      <button class="menu-btn" (click)="toggleControlPanel()">Menú ☰</button>
+    </div>
+    <div class="control-panel" [class.visible]="controlPanelVisible">
+      <button class="tab active" (click)="cambiarTab('overview')">Vista General</button>
+      <button class="tab" (click)="cambiarTab('diplomacy')">Diplomacia</button>
+      <button class="tab" (click)="cambiarTab('trade')">Comercio</button>
+      <button class="tab" (click)="cambiarTab('technology')">Tecnología</button>
+      <button class="tab" (click)="siguienteTurno()">⏭️ Siguiente Turno</button>
+      <button class="tab" (click)="toggleAutoPlay()">🤖 Auto-Jugar</button>
+      <button class="tab" (click)="mostrarEstadisticas()">📊 Estadísticas</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modales -->
+<div class="modal" id="fleet-modal">
+  <div class="modal-content">
+    <h3>🚀 Gestión de Flota</h3>
+    <div id="fleet-content"></div>
+    <button class="btn" (click)="cerrarModal()">
+      Cerrar
+    </button>
+  </div>
+</div>
+
+<!-- Sistema de notificaciones -->
+<div class="notification" id="notification"></div>

@@ -1,0 +1,97 @@
+.control-panel {
+  position: absolute;
+  bottom: 0;
+  left: 200px; /* Same as sidebar width */
+  right: 300px; /* Same as info panel width */
+  height: 180px;
+  background-color: rgba(22, 27, 34, 0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1rem;
+}
+
+.panel-title {
+  margin: 0 0 1rem 0;
+  color: #ffffff;
+  font-size: 1.2rem;
+}
+
+.ship-list {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.ship-card {
+  width: 120px;
+  background-color: #2d333b;
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: transform 0.2s;
+}
+
+.ship-card:hover {
+  transform: translateY(-5px);
+}
+
+.ship-card.disabled {
+  opacity: 0.6;
+}
+
+.ship-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ship-icon {
+  font-size: 1.5rem;
+}
+
+.ship-name {
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.ship-cost {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cost-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #8b949e;
+  font-size: 0.8rem;
+}
+
+.resource-icon {
+  font-size: 0.9rem;
+}
+
+.build-button {
+  margin-top: auto;
+  padding: 0.4rem;
+  background-color: #238636;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 0.9rem;
+}
+
+.build-button:hover:not(:disabled) {
+  background-color: #2ea043;
+}
+
+.build-button:disabled {
+  background-color: #1b2428;
+  cursor: not-allowed;
+}

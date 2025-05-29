@@ -1,0 +1,49 @@
+@if (sistemaSeleccionado) {
+  <div>
+    <h3>🌟 {{ sistemaSeleccionado.name }}</h3>
+    <div>Propietario: {{ juegoService.getNombrePropietario(sistemaSeleccionado.owner) }}</div>
+    <div>Tipo: Estrella {{ sistemaSeleccionado.type }}</div>
+    <div>Población: {{ sistemaSeleccionado.population }}</div>
+    <div>Recursos: {{ sistemaSeleccionado.resources }}</div>
+    <div>Desarrollo: {{ '⭐'.repeat(sistemaSeleccionado.development) }}</div>
+    <div>Defensa: {{ sistemaSeleccionado.defense }}</div>
+    
+    <div class="fleet-display">
+      @for (nave of navesEnSistema; track nave.id) {
+        <div class="ship-card">
+          <div>{{ juegoService.tiposNave[nave.type].icon }}</div>
+          <div>{{ nave.type }}</div>
+          <div>HP: {{ nave.hp }}/{{ nave.maxHp }}</div>
+          <div>ATK: {{ nave.attack }}</div>
+        </div>
+      } @empty {
+        <div style="text-align: center; color: #666;">No hay naves en este sistema</div>
+      }
+    </div>
+    
+    <!-- Botones de acción según propietario -->
+    @if (sistemaSeleccionado.owner === 'player') {
+      <button class="btn" (click)="mejorarSistema()">Mejorar Sistema (E:100 M:50)</button>
+    } @else if (sistemaSeleccionado.owner === 'neutral') {
+      <button class="btn" (click)="colonizarSistema()">Colonizar (Requiere nave colonia)</button>
+    } @else {
+      <button class="btn danger" (click)="atacarSistema()">Atacar Sistema</button>
+    }
+    
+    <button class="btn" (click)="mostrarGestionFlota()">Gestionar Flota</button>
+  </div>
+} @else {
+  <div>
+    <h3>🌌 Galaxia</h3>
+    <div>Selecciona un sistema para ver detalles</div>
+  </div>
+}
+
+<div class="section">
+  <h3>📜 Registro</h3>
+  <div class="log">
+    @for (mensaje of juegoService.logs(); track $index) {
+      <div class="log-entry">{{ mensaje }}</div>
+    }
+  </div>
+</div>

@@ -1,0 +1,610 @@
+/* Contenedor principal del mapa */
+.galaxy-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #000;
+  user-select: none;
+}
+
+/* Canvas para el mapa */
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+/* Controles del mapa */
+.map-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 10;
+}
+
+.control-btn {
+  background-color: rgba(20, 30, 70, 0.7);
+  color: #fff;
+  border: 1px solid #0088ff;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+  background-color: rgba(30, 40, 100, 0.8);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 5px rgba(0, 136, 255, 0.3);
+}
+
+/* Panel de información */
+.info-panel {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  width: 250px;
+  background-color: rgba(20, 30, 70, 0.8);
+  border: 1px solid #0088ff;
+  border-radius: 8px;
+  padding: 15px;
+  color: #fff;
+  z-index: 10;
+}
+
+.info-panel h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #00ffcc;
+  border-bottom: 1px solid #0088ff;
+  padding-bottom: 5px;
+}
+
+.info-panel p {
+  margin: 5px 0;
+  font-size: 14px;
+}
+
+.actions {
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-btn {
+  background-color: rgba(0, 100, 200, 0.5);
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background-color: rgba(0, 120, 255, 0.7);
+}
+
+.action-btn:disabled {
+  background-color: rgba(100, 100, 100, 0.5);
+  cursor: not-allowed;
+}
+
+.action-btn.danger {
+  background-color: rgba(200, 50, 50, 0.7);
+}
+
+.action-btn.danger:hover {
+  background-color: rgba(255, 70, 70, 0.8);
+}
+
+/* Modal de batalla */
+.modal-batalla {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.modal-content {
+  width: 80%;
+  max-width: 700px;
+  background-color: #111836;
+  border: 2px solid #ff3300;
+  border-radius: 10px;
+  padding: 20px;
+  color: #fff;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #ff3300;
+  padding-bottom: 10px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #ff5500;
+}
+
+.close-btn {
+  background-color: transparent;
+  color: #fff;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.batalla-info {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.batalla-imagen {
+  width: 100%;
+  height: 200px;
+  background-color: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+.batalla-placeholder {
+  color: #888;
+  font-style: italic;
+}
+
+.fuerzas-container {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.fuerzas {
+  flex: 1;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.fuerzas.atacantes {
+  background-color: rgba(200, 50, 50, 0.2);
+  border: 1px solid #ff3300;
+}
+
+.fuerzas.defensoras {
+  background-color: rgba(50, 150, 50, 0.2);
+  border: 1px solid #00cc00;
+}
+
+.fuerzas h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.fuerzas ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.batalla-resultado {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: rgba(50, 50, 150, 0.2);
+  border: 1px solid #0088ff;
+  border-radius: 5px;
+}
+
+/* Ayuda */
+.help-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 200;
+}
+
+.help-content {
+  width: 400px;
+  background-color: #111836;
+  border: 2px solid #0088ff;
+  border-radius: 10px;
+  padding: 20px;
+  color: #fff;
+}
+
+.help-content h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #00ffcc;
+  border-bottom: 1px solid #0088ff;
+  padding-bottom: 5px;
+}
+
+.help-content ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.help-content li {
+  margin-bottom: 10px;
+}
+
+/* Estilos para los outposts y naves */
+.ship {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: #00ff00;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+}
+
+.ship.moving {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.2); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Panel de control de unidades (footer) - solo visible cuando se selecciona un planeta */
+.panel-control-unidades {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background-color: rgba(10, 20, 40, 0.9);
+  border-top: 2px solid #0088ff;
+  color: #fff;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 20px;
+  box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.5);
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+  max-height: 130px;
+}
+
+.panel-control-unidades.visible {
+  transform: translateY(0);
+}
+
+/* Estilos para el diálogo de confirmación de movimiento */
+.confirmacion-movimiento {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 150;
+}
+
+.confirmacion-contenido {
+  background-color: #111836;
+  border: 2px solid #0088ff;
+  border-radius: 10px;
+  padding: 20px;
+  width: 350px;
+  color: white;
+  text-align: center;
+  box-shadow: 0 0 20px rgba(0, 136, 255, 0.5);
+}
+
+.confirmacion-contenido h3 {
+  margin-top: 0;
+  color: #00ffcc;
+  font-size: 1.2em;
+}
+
+.confirmacion-botones {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.confirmacion-botones .action-btn {
+  min-width: 100px;
+  padding: 8px 15px;
+  background-color: #0088ff;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  margin: 5px;
+}
+
+.confirmacion-botones .action-btn:hover {
+  background-color: #00aaff;
+  box-shadow: 0 0 10px rgba(0, 136, 255, 0.7);
+}
+
+.confirmacion-botones .action-btn.secondary {
+  background-color: #555;
+}
+
+.confirmacion-botones .action-btn.secondary:hover {
+  background-color: #777;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(0, 136, 255, 0.5);
+}
+
+.panel-header h3 {
+  margin: 0;
+  color: #00ffcc;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+}
+
+.panel-header h3::before {
+  content: '🚨';
+  margin-right: 8px;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.panel-actions .action-btn {
+  background-color: rgba(0, 100, 200, 0.4);
+  border: 1px solid #0088ff;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.panel-actions .action-btn:hover {
+  background-color: rgba(0, 120, 240, 0.6);
+  transform: translateY(-2px);
+}
+
+.panel-actions .action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.panel-actions .action-btn .icon {
+  margin-right: 5px;
+  font-size: 14px;
+}
+
+.unidades-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  padding: 5px 0;
+  max-height: 130px;
+  overflow-y: auto;
+}
+
+.unidad-item {
+  width: 80px;
+  height: 90px;
+  background-color: rgba(0, 50, 100, 0.4);
+  border: 1px solid #0066aa;
+  border-radius: 5px;
+  padding: 5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.unidad-item:hover {
+  background-color: rgba(0, 70, 150, 0.6);
+  transform: translateY(-2px);
+}
+
+.sistema-seleccionado {
+  stroke: #00ffcc;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 15px rgba(0, 255, 204, 0.8));
+  animation: pulse-selection 1.5s infinite alternate;
+}
+
+@keyframes pulse-selection {
+  0% { stroke-width: 2; filter: drop-shadow(0 0 10px rgba(0, 255, 204, 0.7)); }
+  100% { stroke-width: 4; filter: drop-shadow(0 0 20px rgba(0, 255, 204, 0.9)); }
+}
+
+.unidad-item.seleccionada::after {
+  content: '✔';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  background-color: #00ff88;
+  color: #000;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.unidad-icono {
+  font-size: 24px;
+  margin-bottom: 5px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 100, 200, 0.3);
+  border-radius: 50%;
+}
+
+.nave-tipo-fighter {
+  color: #ff5500;
+  background-color: rgba(255, 85, 0, 0.2);
+}
+
+.nave-tipo-scout {
+  color: #00ffff;
+  background-color: rgba(0, 255, 255, 0.2);
+}
+
+.nave-tipo-cruiser {
+  color: #ffcc00;
+  background-color: rgba(255, 204, 0, 0.2);
+}
+
+.nave-tipo-colony {
+  color: #00ff88;
+  background-color: rgba(0, 255, 136, 0.2);
+}
+
+.unidad-info {
+  text-align: center;
+  font-size: 12px;
+}
+
+.unidad-tipo {
+  font-weight: bold;
+  margin-bottom: 3px;
+  text-transform: capitalize;
+}
+
+.unidad-salud {
+  font-size: 10px;
+  color: #88ff88;
+}
+
+.instrucciones-panel {
+  width: 100%;
+  padding: 5px 0;
+  font-size: 12px;
+  color: #aaccff;
+  text-align: center;
+  font-style: italic;
+  border-top: 1px solid rgba(0, 136, 255, 0.3);
+}
+
+/* Diálogo de confirmación de movimiento */
+.confirmacion-movimiento {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 100;
+}
+
+.confirmacion-contenido {
+  background-color: rgba(20, 30, 60, 0.95);
+  border: 2px solid #0088ff;
+  border-radius: 8px;
+  padding: 20px;
+  width: 300px;
+  text-align: center;
+  box-shadow: 0 0 20px rgba(0, 136, 255, 0.5);
+}
+
+.confirmacion-contenido h3 {
+  margin-top: 0;
+  color: #00ffcc;
+  font-size: 18px;
+}
+
+.confirmacion-contenido p {
+  margin: 15px 0;
+  color: #fff;
+}
+
+.confirmacion-botones {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.confirmacion-botones .action-btn {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirmacion-botones .action-btn:hover {
+  transform: translateY(-2px);
+}
+
+.confirmacion-botones .action-btn:first-child {
+  background-color: #0088ff;
+  color: white;
+}
+
+.confirmacion-botones .action-btn:first-child:hover {
+  background-color: #00aaff;
+  box-shadow: 0 2px 5px rgba(0, 136, 255, 0.5);
+}
+
+.confirmacion-botones .action-btn.secondary {
+  background-color: rgba(150, 150, 150, 0.3);
+  color: #ddd;
+}
+
+.confirmacion-botones .action-btn.secondary:hover {
+  background-color: rgba(150, 150, 150, 0.5);
+}

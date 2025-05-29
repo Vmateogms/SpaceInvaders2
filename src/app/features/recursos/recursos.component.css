@@ -1,0 +1,31 @@
+.resources-container {
+  display: flex;
+  gap: 1.5rem;
+  background-color: rgba(0, 0, 0, 0.7);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+}
+
+.resource {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+}
+
+.resource-icon {
+  font-size: 1.2rem;
+  margin-bottom: 0.25rem;
+}
+
+.resource-value {
+  font-weight: bold;
+  font-size: 1rem;
+  color: #ffffff;
+}
+
+.resource-label {
+  font-size: 0.75rem;
+  color: #aaaaaa;
+  text-transform: uppercase;
+}

@@ -1,0 +1,54 @@
+<div class="control-panel">
+  <h3 class="panel-title">Shipyard</h3>
+  
+  <div class="ship-list">
+    @for (shipType of shipTypes; track shipType) {
+      <div class="ship-card" [class.disabled]="!canAffordShip(shipType)">
+        <div class="ship-header">
+          <div class="ship-icon">
+            @if (shipType === 'SCOUT') {
+              🛸
+            } @else if (shipType === 'FIGHTER') {
+              🚀
+            } @else if (shipType === 'CRUISER') {
+              🛰️
+            } @else if (shipType === 'BATTLESHIP') {
+              ⚔️
+            } @else if (shipType === 'DREADNOUGHT') {
+              💥
+            }
+          </div>
+          <div class="ship-name">{{ shipType }}</div>
+        </div>
+        
+        <div class="ship-cost">
+          @if (getShipCost(shipType).credits > 0) {
+            <div class="cost-item">
+              <span class="resource-icon">💰</span>
+              <span>{{ getShipCost(shipType).credits }}</span>
+            </div>
+          }
+          @if (getShipCost(shipType).materials > 0) {
+            <div class="cost-item">
+              <span class="resource-icon">🔩</span>
+              <span>{{ getShipCost(shipType).materials }}</span>
+            </div>
+          }
+          @if (getShipCost(shipType).energy > 0) {
+            <div class="cost-item">
+              <span class="resource-icon">🔋</span>
+              <span>{{ getShipCost(shipType).energy }}</span>
+            </div>
+          }
+        </div>
+        
+        <button 
+          class="build-button" 
+          [disabled]="!canAffordShip(shipType)"
+          (click)="buildShip(shipType)">
+          Build
+        </button>
+      </div>
+    }
+  </div>
+</div>

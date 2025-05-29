@@ -1,0 +1,171 @@
+/* Estilos para que el juego ocupe toda la pantalla */
+.game-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Header con recursos */
+.header {
+  background-color: rgba(10, 20, 40, 0.9);
+  border-bottom: 2px solid #0088ff;
+  padding: 5px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 40px;
+  z-index: 100;
+}
+
+/* Estilos del panel de control desplegable */
+.control-panel-corner {
+  position: fixed;
+  top: 50px;
+  right: 10px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.menu-toggle .menu-btn {
+  background-color: rgba(0, 100, 200, 0.7);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 15px;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.menu-toggle .menu-btn:hover {
+  background-color: rgba(0, 130, 250, 0.9);
+  transform: translateY(-2px);
+}
+
+.control-panel {
+  background-color: rgba(10, 20, 40, 0.9);
+  border: 2px solid #0088ff;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 10px;
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  width: 180px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+}
+
+.control-panel.visible {
+  display: flex;
+}
+
+.control-panel .tab {
+  background-color: rgba(0, 80, 150, 0.6);
+  color: white;
+  border: 1px solid #0066aa;
+  border-radius: 5px;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.control-panel .tab:hover {
+  background-color: rgba(0, 100, 180, 0.8);
+}
+
+.control-panel .tab.active {
+  background-color: rgba(0, 150, 100, 0.7);
+  border-color: #00aa77;
+}
+
+/* Panel lateral izquierdo desplegable */
+.sidebar {
+  position: fixed;
+  top: 40px;
+  left: 0;
+  height: calc(100vh - 40px);
+  width: 250px;
+  background-color: rgba(10, 20, 40, 0.9);
+  border-right: 2px solid #0088ff;
+  transform: translateX(-220px);
+  transition: transform 0.3s ease;
+  z-index: 90;
+  overflow-y: scroll; /* o auto, según tu necesidad */
+  overflow-x: hidden;
+  padding-right: 30px;
+
+  /* Ocultar scrollbar en navegadores modernos */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE y Edge antiguos */
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari y Opera */
+}
+
+.sidebar:hover {
+  transform: translateX(0);
+}
+
+.sidebar::after {
+  content: '\25B6';
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  color: #0088ff;
+  font-size: 18px;
+}
+
+.sidebar:hover::after {
+  content: '\25C0';
+}
+
+/* Ajustar la posición del mapa y otros componentes */
+.galaxy-map {
+  position: absolute;
+  top: 40px; /* Solo dejamos espacio para la cabecera */
+  left: 0;
+  right: 0;
+  bottom: 0; /* El panel de unidades aparecerá encima, no quitamos espacio */
+  overflow: hidden;
+  z-index: 10;
+}
+
+/* Info panel derecho como desplegable */
+.info-panel {
+  position: fixed;
+  top: 40px;
+  right: 0;
+  height: calc(100vh - 40px);
+  width: 250px;
+  background-color: rgba(10, 20, 40, 0.9);
+  border-left: 2px solid #0088ff;
+  transform: translateX(220px);
+  transition: transform 0.3s ease;
+  z-index: 90;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-left: 30px;
+}
+
+.info-panel:hover {
+  transform: translateX(0);
+}
+
+.info-panel::after {
+  content: '\25C0';
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  color: #0088ff;
+  font-size: 18px;
+}
+
+.info-panel:hover::after {
+  content: '\25B6';
+}
