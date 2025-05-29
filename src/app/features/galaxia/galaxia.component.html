@@ -81,68 +81,80 @@
     </div>
   }
   
-  <!-- PANEL DE CONTROL DE UNIDADES -->
-  <div id="panel-control-unidades" style="width: 350px !important; z-index: 5000; position: fixed; right: 50px; top: 50px; border: 3px solid #3498db; background-color: rgba(0, 0, 30, 0.9); border-radius: 10px; box-shadow: 0 0 20px rgba(52, 152, 219, 0.5);">
-    <!-- Cabecera del panel -->
-    <div class="panel-header" style="background-color: #2c3e50; padding: 15px; border-bottom: 2px solid #3498db; border-radius: 7px 7px 0 0;">
-      <h3 style="font-size: 22px; color: white; text-shadow: 0 0 5px #3498db; margin: 0 0 10px 0;">Control de Unidades</h3>
-      <div style="margin-top: 10px; display: flex; justify-content: space-between;">
-        <button (click)="seleccionarTodasLasNaves()" style="flex: 1; padding: 12px 15px; background-color: #2980b9; border: none; color: white; margin-right: 10px; cursor: pointer; border-radius: 5px; font-weight: bold;">
-          <span style="font-size: 18px;">🔘</span> Seleccionar todas
-        </button>
-        <button (click)="deseleccionarTodasLasNaves()" style="flex: 1; padding: 12px 15px; background-color: #7f8c8d; border: none; color: white; cursor: pointer; border-radius: 5px; font-weight: bold;">
-          <span style="font-size: 18px;">⚪</span> Deseleccionar
-        </button>
+  <!-- PANEL DE CONTROL DE UNIDADES - Solo visible al seleccionar un planeta propio -->
+  @if (seleccionActual() === 'sistema' && getSistemaSeleccionado()?.owner === 'player') {
+    <div id="panel-control-unidades" 
+         style="width: 350px !important; z-index: 5000; position: fixed; right: 50px; top: 50px; border: 3px solid #3498db; background-color: rgba(0, 0, 30, 0.9); border-radius: 10px; box-shadow: 0 0 20px rgba(52, 152, 219, 0.5);">
+      <!-- Botón de cierre -->
+      <div style="position: absolute; top: -15px; right: -15px; background-color: #e74c3c; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);" 
+           (click)="ocultarPanelUnidades($event)">
+        ×
       </div>
-    </div>
-    
-    <!-- Contenedor principal -->
-    <div style="padding: 15px;">
-      <!-- Panel de depuración -->
-      <div style="border: 2px solid red; padding: 8px; margin-bottom: 15px; color: white; font-weight: bold; text-align: center; background-color: rgba(255, 0, 0, 0.2);">
-        Naves disponibles: {{ navesDisponiblesEnSistema().length }} | 
-        Naves seleccionadas: {{ navesSeleccionadas().length }}
+      <!-- Indicador de sistema seleccionado -->
+      <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background-color: #3498db; color: white; padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: bold;">
+        {{ getSistemaSeleccionado()?.name || 'Sistema' }}
+      </div>
+      <!-- Cabecera del panel -->
+      <div class="panel-header" style="background-color: #2c3e50; padding: 15px; border-bottom: 2px solid #3498db; border-radius: 7px 7px 0 0;">
+        <h3 style="font-size: 22px; color: white; text-shadow: 0 0 5px #3498db; margin: 0 0 10px 0;">Control de Unidades</h3>
+        <div style="margin-top: 10px; display: flex; justify-content: space-between;">
+          <button (click)="seleccionarTodasLasNaves()" style="flex: 1; padding: 12px 15px; background-color: #2980b9; border: none; color: white; margin-right: 10px; cursor: pointer; border-radius: 5px; font-weight: bold;">
+            <span style="font-size: 18px;">🔘</span> Seleccionar todas
+          </button>
+          <button (click)="deseleccionarTodasLasNaves()" style="flex: 1; padding: 12px 15px; background-color: #7f8c8d; border: none; color: white; cursor: pointer; border-radius: 5px; font-weight: bold;">
+            <span style="font-size: 18px;">⚪</span> Deseleccionar
+          </button>
+        </div>
       </div>
       
-      <!-- Área de unidades con scroll -->
-      <div style="max-height: 400px; overflow-y: auto; padding-right: 10px; margin-bottom: 15px;">
-        @if (navesDisponiblesEnSistema().length > 0) {
-          @for (nave of navesDisponiblesEnSistema(); track nave.id) {
-            <button 
-              [class.seleccionada]="esNaveSeleccionada(nave)" 
-              (click)="seleccionarNaveDirecto(nave)"
-              style="display: flex; width: 100%; align-items: center; cursor: pointer; padding: 15px; 
-                     margin: 0 0 15px 0; border: 2px solid #444; border-radius: 8px; background-color: rgba(30, 30, 50, 0.8);
-                     position: relative; z-index: 10000; text-align: left; color: white; font-family: inherit;">
-              <div style="font-size: 30px; margin-right: 15px; width: 40px; text-align: center;">
-                {{ nave.type === 'fighter' ? '⚔️' : nave.type === 'scout' ? '🔍' : nave.type === 'cruiser' ? '🚢' : '🛸' }}
-              </div>
-              <div style="flex: 1;">
-                <div style="font-weight: bold; font-size: 16px;">{{ nave.type | uppercase }}</div>
-                <div style="font-size: 12px; color: #3498db;">ID: {{ nave.id }}</div>
-                <div style="margin-top: 5px;">HP: {{ nave.hp }}/{{ nave.maxHp }}</div>
-              </div>
-            </button>
+      <!-- Contenedor principal -->
+      <div style="padding: 15px;">
+        <!-- Panel de depuración -->
+        <div style="border: 2px solid red; padding: 8px; margin-bottom: 15px; color: white; font-weight: bold; text-align: center; background-color: rgba(255, 0, 0, 0.2);">
+          Naves disponibles: {{ navesDisponiblesEnSistema().length }} | 
+          Naves seleccionadas: {{ navesSeleccionadas().length }}
+        </div>
+        
+        <!-- Área de unidades con scroll -->
+        <div style="max-height: 400px; overflow-y: auto; padding-right: 10px; margin-bottom: 15px;">
+          @if (navesDisponiblesEnSistema().length > 0) {
+            @for (nave of navesDisponiblesEnSistema(); track nave.id) {
+              <button 
+                [class.seleccionada]="esNaveSeleccionada(nave)" 
+                (click)="seleccionarNaveDirecto(nave)"
+                style="display: flex; width: 100%; align-items: center; cursor: pointer; padding: 15px; 
+                       margin: 0 0 15px 0; border: 2px solid #444; border-radius: 8px; background-color: rgba(30, 30, 50, 0.8);
+                       position: relative; z-index: 10000; text-align: left; color: white; font-family: inherit;">
+                <div style="font-size: 30px; margin-right: 15px; width: 40px; text-align: center;">
+                  {{ nave.type === 'fighter' ? '⚔️' : nave.type === 'scout' ? '🔍' : nave.type === 'cruiser' ? '🚢' : '🛸' }}
+                </div>
+                <div style="flex: 1;">
+                  <div style="font-weight: bold; font-size: 16px;">{{ nave.type | uppercase }}</div>
+                  <div style="font-size: 12px; color: #3498db;">ID: {{ nave.id }}</div>
+                  <div style="margin-top: 5px;">HP: {{ nave.hp }}/{{ nave.maxHp }}</div>
+                </div>
+              </button>
+            }
+          } @else {
+            <div style="padding: 30px 15px; text-align: center; color: #aaa; background-color: rgba(0, 0, 0, 0.3); border-radius: 8px;">
+              <div style="font-size: 30px; margin-bottom: 10px;">🚨</div>
+              <div>No hay unidades disponibles en este sistema</div>
+            </div>
           }
-        } @else {
-          <div style="padding: 30px 15px; text-align: center; color: #aaa; background-color: rgba(0, 0, 0, 0.3); border-radius: 8px;">
-            <div style="font-size: 30px; margin-bottom: 10px;">🚨</div>
-            <div>No hay unidades disponibles en este sistema</div>
-          </div>
-        }
-      </div>
-      
-      <!-- Instrucciones -->
-      <div style="padding: 10px; background-color: rgba(52, 152, 219, 0.2); border-radius: 5px; text-align: center; color: white; margin-bottom: 10px;">
-        Selecciona una unidad y luego haz clic derecho en el mapa para moverla
-      </div>
-      
-      <!-- Estado actual -->
-      <div style="padding: 8px; color: #aaa; text-align: center; font-size: 14px;">
-        {{ navesSeleccionadas().length > 0 ? navesSeleccionadas().length + ' unidades seleccionadas' : 'No hay unidades seleccionadas' }}
+        </div>
+        
+        <!-- Instrucciones -->
+        <div style="padding: 10px; background-color: rgba(52, 152, 219, 0.2); border-radius: 5px; text-align: center; color: white; margin-bottom: 10px;">
+          Selecciona una unidad y luego haz clic derecho en el mapa para moverla
+        </div>
+        
+        <!-- Estado actual -->
+        <div style="padding: 8px; color: #aaa; text-align: center; font-size: 14px;">
+          {{ navesSeleccionadas().length > 0 ? navesSeleccionadas().length + ' unidades seleccionadas' : 'No hay unidades seleccionadas' }}
+        </div>
       </div>
     </div>
-  </div>
+  }
   
   <!-- Diálogo de confirmación de movimiento siempre visible (simplificado) -->
   <div class="confirmacion-movimiento" [style.display]="mostrarConfirmacionMovimiento() ? 'flex' : 'none'" 
@@ -166,9 +178,14 @@
           <button class="close-btn" (click)="cerrarModalBatalla()">&times;</button>
         </div>
         <div class="batalla-info">
-          <div class="batalla-imagen">
-            <!-- Aquí iría la imagen de la batalla -->
-            <div class="batalla-placeholder">Imagen de Batalla</div>
+          <div class="batalla-imagen" style="text-align: center; margin-bottom: 15px;">
+            <!-- Imagen dinámica de batalla basada en el tipo de naves -->
+            <img 
+              [src]="getImagenBatalla(conflictoActivo)" 
+              alt="Batalla espacial" 
+              style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 0 15px rgba(255, 100, 100, 0.8);"
+            />
+            <div style="font-size: 12px; color: #aaa; margin-top: 5px;">{{ getDescripcionBatalla(conflictoActivo) }}</div>
           </div>
           <div class="fuerzas-container">
             <div class="fuerzas atacantes">

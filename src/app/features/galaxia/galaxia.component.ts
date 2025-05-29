@@ -1122,6 +1122,51 @@ export class GalaxiaComponent implements AfterViewInit {
     this.conflictoActivo = null;
   }
   
+  // Método para determinar qué imagen mostrar en el modal de batalla
+  getImagenBatalla(conflicto: ConflictoBatalla): string {
+    if (!conflicto) return 'assets/images/battles/fighter.png';
+    
+    // Comprueba si hay naves grandes involucradas
+    const hayNavesGrandes = conflicto.atacantes.some(atacante => 
+      ['battleship', 'acorazado', 'dreadnought', 'capital', 'cruiser', 'crucero', 'destroyer', 'destructor']
+        .includes(atacante.tipo?.toLowerCase() || '')
+    );
+    
+    // Devuelve la imagen adecuada
+    return hayNavesGrandes
+      ? 'assets/images/battles/navegrande.png'
+      : 'assets/images/battles/fighter.png';
+  }
+  
+  // Método para generar una descripción de la batalla
+  getDescripcionBatalla(conflicto: ConflictoBatalla): string {
+    if (!conflicto) return 'Batalla espacial en curso';
+    
+    // Contar tipos de naves atacantes
+    const tiposAtacantes = new Map<string, number>();
+    conflicto.atacantes.forEach(atacante => {
+      const tipo = atacante.tipo?.toLowerCase() || 'desconocido';
+      tiposAtacantes.set(tipo, (tiposAtacantes.get(tipo) || 0) + 1);
+    });
+    
+    // Genera descripción basada en tipos de naves
+    const descripcion: string[] = [];
+    tiposAtacantes.forEach((cantidad, tipo) => {
+      let nombreTipo = tipo;
+      switch(tipo) {
+        case 'fighter': nombreTipo = 'Cazas'; break;
+        case 'scout': nombreTipo = 'Exploradores'; break;
+        case 'cruiser': nombreTipo = 'Cruceros'; break;
+        case 'battleship': nombreTipo = 'Acorazados'; break;
+        case 'destroyer': nombreTipo = 'Destructores'; break;
+        case 'dreadnought': nombreTipo = 'Acorazados Pesados'; break;
+      }
+      descripcion.push(`${cantidad} ${nombreTipo}`); 
+    });
+    
+    return `Batalla: ${descripcion.join(', ')} vs. ${conflicto.defensores[0]?.tipo || 'Fuerzas defensoras'}`;
+  }
+  
   // Método para centrar la vista en el sistema del jugador
   centrarEnSistemaJugador(): void {
     const sistemas = this.juegoService.estadoJuego().systems;
@@ -1232,6 +1277,18 @@ export class GalaxiaComponent implements AfterViewInit {
   // Verificar si hay naves disponibles
   hayNavesDisponibles(): boolean {
     return this.navesDisponiblesEnSistema().length > 0;
+  }
+  
+  // Método para ocultar el panel de unidades
+  ocultarPanelUnidades(event: MouseEvent): void {
+    // Detener la propagación del evento
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Cambiar la selección actual para ocultar el panel
+    this.seleccionActual.set(null);
+    
+    console.log('Panel de unidades ocultado');
   }
   
   // ==================== SISTEMA DE SELECCIÓN DE NAVES ====================
